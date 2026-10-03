@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ArrowUpRight,
   CalendarDays,
+  Sparkles,
 } from "lucide-react";
 import {
   BarChart,
@@ -50,32 +51,45 @@ export function OverviewView() {
     return <OverviewSkeleton />;
   }
 
+  // 4 spec cards: Bugünkü Rezervasyonlar, Aktif Masalar, Toplam Menü Ürünü,
+  // Bugünkü Misafir Sayısı
   const stats = [
     {
-      label: "Bugünkü Rezervasyon",
+      label: "Bugünkü Rezervasyonlar",
       value: data.reservations.today,
       icon: CalendarCheck,
       tint: "bg-rose-500/10 text-rose-600",
+      sub: `${data.reservations.pending} beklemede`,
     },
     {
-      label: "Bekleyen Talep",
-      value: data.reservations.pending,
-      icon: Clock,
-      tint: "bg-amber-500/10 text-amber-600",
+      label: "Aktif Masalar",
+      value: data.counts.activeTables,
+      icon: LayoutGrid,
+      tint: "bg-emerald-500/10 text-emerald-600",
+      sub: `${data.counts.tables} toplam masa`,
     },
     {
-      label: "Menü Ürünü",
+      label: "Toplam Menü Ürünü",
       value: data.counts.menuItems,
       icon: UtensilsCrossed,
       tint: "bg-orange-500/10 text-orange-600",
+      sub: `${data.counts.categories} kategori`,
     },
     {
-      label: "Toplam Masa",
-      value: data.counts.tables,
-      icon: LayoutGrid,
-      tint: "bg-emerald-500/10 text-emerald-600",
+      label: "Bugünkü Misafir Sayısı",
+      value: data.reservations.todayGuests,
+      icon: Users,
+      tint: "bg-amber-500/10 text-amber-600",
+      sub: `${data.reservations.confirmed} onaylı`,
     },
   ];
+
+  // Detect empty state: fresh restaurant with no menu items, no tables, no
+  // reservations at all. Show a guided onboarding panel.
+  const isEmpty =
+    data.counts.menuItems === 0 &&
+    data.counts.tables === 0 &&
+    data.counts.reservations === 0;
 
   const chartData = data.reservations.byDay.map((d) => ({
     name: new Date(d.date).toLocaleDateString("tr-TR", {
@@ -116,7 +130,7 @@ export function OverviewView() {
         </Button>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid — 4 spec cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {stats.map((s, i) => (
           <motion.div
@@ -137,11 +151,17 @@ export function OverviewView() {
                   {s.value}
                 </p>
                 <p className="text-sm text-muted-foreground">{s.label}</p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  {s.sub}
+                </p>
               </CardContent>
             </Card>
           </motion.div>
         ))}
       </div>
+
+      {/* Empty state for fresh restaurant with no data */}
+      {isEmpty && <EmptyStateDashboard />}
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
         {/* Weekly reservations chart */}
@@ -400,6 +420,88 @@ function SummaryRow({
       </span>
       <span className="font-semibold tabular-nums">{value}</span>
     </div>
+  );
+}
+
+function EmptyStateDashboard() {
+  const navigate = useNavigate();
+  const steps = [
+    {
+      icon: UtensilsCrossed,
+      title: "Menünü oluştur",
+      desc: "Kategoriler ekle, ürünlerini tanımla ve fiyat belirle.",
+      action: "Menüye Git",
+      tab: "menu",
+      tint: "bg-orange-500/10 text-orange-600",
+    },
+    {
+      icon: LayoutGrid,
+      title: "Masalarını ekle",
+      desc: "Restoranındaki masaları ve kapasitelerini tanımla.",
+      action: "Masalara Git",
+      tab: "tables",
+      tint: "bg-emerald-500/10 text-emerald-600",
+    },
+    {
+      icon: CalendarCheck,
+      title: "İlk rezervasyonu al",
+      desc: "Manuel ekle veya public sayfanı paylaşarak online talep topla.",
+      action: "Rezervasyon Ekle",
+      tab: "reservations",
+      tint: "bg-rose-500/10 text-rose-600",
+    },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6"
+    >
+      <Card className="border-dashed border-primary/30 bg-primary/[0.02]">
+        <CardContent className="p-6 sm:p-8">
+          <div className="text-center mb-6">
+            <div className="inline-flex w-12 h-12 rounded-2xl bg-primary/10 items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6 text-primary" />
+            </div>
+            <h3 className="text-lg font-semibold">Hoş geldin! Başlayalım 🎉</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+              Restoranın henüz boş. Aşağıdaki 3 adımı tamamlayarak yönetim
+              panelini aktif hale getir.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {steps.map((s, i) => (
+              <div
+                key={s.title}
+                className="rounded-xl border border-border/60 bg-card p-4 flex flex-col"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${s.tint}`}>
+                    <s.icon className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="text-xs font-bold text-muted-foreground/50 tabular-nums">
+                    {i + 1}
+                  </span>
+                </div>
+                <h4 className="font-medium text-sm">{s.title}</h4>
+                <p className="text-xs text-muted-foreground mt-1 flex-1">
+                  {s.desc}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 w-full"
+                  onClick={() => navigate(`/dashboard/${s.tab}`)}
+                >
+                  {s.action}
+                  <ArrowUpRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 

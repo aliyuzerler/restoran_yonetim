@@ -120,11 +120,13 @@ export type DashboardStats = {
   counts: {
     menuItems: number;
     tables: number;
+    activeTables: number;
     reservations: number;
     categories: number;
   };
   reservations: {
     today: number;
+    todayGuests: number;
     pending: number;
     confirmed: number;
     byStatus: Record<string, number>;

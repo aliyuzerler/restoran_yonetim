@@ -29,6 +29,9 @@ export async function GET(req: NextRequest) {
     const pending = reservations.filter((r) => r.status === "pending");
     const confirmed = reservations.filter((r) => r.status === "confirmed");
 
+    // Today's total guests (sum of guestCount for today's reservations)
+    const todayGuests = todays.reduce((s, r) => s + r.guestCount, 0);
+
     const byStatus: Record<string, number> = {};
     for (const r of reservations) {
       byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
@@ -50,16 +53,20 @@ export async function GET(req: NextRequest) {
     for (const t of allTables) {
       tablesByStatus[t.status] = (tablesByStatus[t.status] ?? 0) + 1;
     }
+    // Active tables = not inactive (available + occupied + reserved + cleaning)
+    const activeTables = allTables.filter((t) => t.status !== "inactive").length;
 
     return Response.json({
       counts: {
         menuItems,
         tables: allTables.length,
+        activeTables,
         reservations: reservations.length,
         categories,
       },
       reservations: {
         today: todays.length,
+        todayGuests,
         pending: pending.length,
         confirmed: confirmed.length,
         byStatus,

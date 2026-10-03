@@ -20,6 +20,8 @@ import {
   CalendarDays,
   BarChart3,
   Users,
+  User as UserIcon,
+  type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useNavigate, useRoute, type Route } from "@/lib/router";
@@ -27,7 +29,6 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useRestaurantStore } from "@/stores/restaurant-store";
 import { Logo } from "@/components/layout/logo";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,16 +60,37 @@ import { CalendarView } from "./views/calendar-view";
 import { AnalyticsView } from "./views/analytics-view";
 import { TeamView } from "./views/team-view";
 
-const NAV = [
-  { tab: "overview", label: "Genel Bakış", icon: LayoutDashboard },
-  { tab: "menu", label: "Menü", icon: UtensilsCrossed },
-  { tab: "tables", label: "Masalar", icon: LayoutGrid },
-  { tab: "reservations", label: "Rezervasyonlar", icon: CalendarCheck },
-  { tab: "calendar", label: "Takvim", icon: CalendarDays },
-  { tab: "analytics", label: "Analitik", icon: BarChart3 },
-  { tab: "team", label: "Ekip", icon: Users },
-  { tab: "settings", label: "Ayarlar", icon: Settings },
-] as const;
+type NavItem = { tab: string; label: string; icon: LucideIcon };
+type NavGroup = { label?: string; items: NavItem[] };
+
+// Spec sidebar: Dashboard, Rezervasyonlar, Masalar, Menü, Restoran, Ayarlar
+// Plus an "İş Araçları" group keeping the extra features accessible.
+const NAV_GROUPS: NavGroup[] = [
+  {
+    items: [
+      { tab: "overview", label: "Dashboard", icon: LayoutDashboard },
+      { tab: "reservations", label: "Rezervasyonlar", icon: CalendarCheck },
+      { tab: "tables", label: "Masalar", icon: LayoutGrid },
+      { tab: "menu", label: "Menü", icon: UtensilsCrossed },
+      { tab: "settings", label: "Restoran", icon: Store },
+    ],
+  },
+  {
+    label: "İş Araçları",
+    items: [
+      { tab: "calendar", label: "Takvim", icon: CalendarDays },
+      { tab: "analytics", label: "Analitik", icon: BarChart3 },
+      { tab: "team", label: "Ekip", icon: Users },
+    ],
+  },
+  {
+    label: "Sistem",
+    items: [{ tab: "account", label: "Ayarlar", icon: Settings }],
+  },
+];
+
+// "account" tab renders the SettingsView too (account/app settings alias)
+const ALL_TABS = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.tab));
 
 export function DashboardShell() {
   const route = useRoute() as Extract<Route, { name: "dashboard" }>;
@@ -91,9 +113,81 @@ export function DashboardShell() {
     toast.success("Çıkış yapıldı");
   };
 
+  const renderNav = (onNav?: () => void) => (
+    <div className="flex flex-col h-full">
+      <nav className="flex-1 space-y-5 overflow-y-auto scrollbar-thin">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={gi}>
+            {group.label && (
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = activeTab === item.tab;
+                return (
+                  <button
+                    key={item.tab}
+                    onClick={() => {
+                      goTab(item.tab);
+                      onNav?.();
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      active
+                        ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                        : "text-foreground/70 hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <item.icon
+                      className={`w-4 h-4 ${active ? "" : "text-muted-foreground"}`}
+                    />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Bottom section: Profil + Çıkış Yap */}
+      <div className="pt-3 mt-3 border-t border-border/60 space-y-1">
+        <button
+          onClick={() => {
+            goTab("account");
+            onNav?.();
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-foreground/70 hover:bg-muted hover:text-foreground transition-all"
+        >
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary shrink-0">
+            {user ? getInitials(user.name) : "?"}
+          </div>
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-xs font-medium truncate">{user?.name}</p>
+            <p className="text-[10px] text-muted-foreground truncate">
+              {user?.email}
+            </p>
+          </div>
+          <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+        <button
+          onClick={() => {
+            handleSignOut();
+            onNav?.();
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-destructive/80 hover:bg-destructive/10 hover:text-destructive transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          Çıkış Yap
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      {/* Top bar */}
+      {/* Top navbar */}
       <header className="sticky top-0 z-30 h-16 border-b border-border/60 bg-background/80 backdrop-blur-lg flex items-center gap-3 px-4 sm:px-6">
         <button
           className="md:hidden -ml-1 p-2 rounded-lg hover:bg-muted"
@@ -182,7 +276,7 @@ export function DashboardShell() {
           <Moon className="w-4 h-4 hidden dark:block" />
         </Button>
 
-        {/* User menu */}
+        {/* User avatar (quick menu) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-lg p-1 pr-2 hover:bg-muted transition-colors">
@@ -208,6 +302,13 @@ export function DashboardShell() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              onClick={() => goTab("account")}
+              className="gap-2 cursor-pointer"
+            >
+              <UserIcon className="w-4 h-4" />
+              Profil / Ayarlar
+            </DropdownMenuItem>
+            <DropdownMenuItem
               onClick={handleSignOut}
               className="gap-2 cursor-pointer text-destructive focus:text-destructive"
             >
@@ -221,41 +322,10 @@ export function DashboardShell() {
       <div className="flex-1 flex">
         {/* Sidebar (desktop) */}
         <aside className="hidden md:flex w-60 flex-col border-r border-border/60 bg-card/30 py-4 px-3 sticky top-16 h-[calc(100vh-4rem)]">
-          <nav className="space-y-1 flex-1">
-            {NAV.map((item) => {
-              const active = activeTab === item.tab;
-              return (
-                <button
-                  key={item.tab}
-                  onClick={() => goTab(item.tab)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-foreground/70 hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  <item.icon className={`w-4 h-4 ${active ? "" : "text-muted-foreground"}`} />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-          <div className="pt-4 border-t border-border/60 space-y-2">
-            {current && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2 text-muted-foreground"
-                onClick={() => navigate(`/r/${current.slug}`)}
-              >
-                <ExternalLink className="w-4 h-4" />
-                Public sayfayı gör
-              </Button>
-            )}
-          </div>
+          {renderNav()}
         </aside>
 
-        {/* Mobile sidebar */}
+        {/* Mobile sidebar / drawer */}
         <AnimatePresence>
           {mobileOpen && (
             <>
@@ -271,27 +341,9 @@ export function DashboardShell() {
                 animate={{ x: 0 }}
                 exit={{ x: -280 }}
                 transition={{ type: "spring", damping: 25, stiffness: 250 }}
-                className="md:hidden fixed left-0 top-16 bottom-0 w-64 bg-background border-r border-border/60 z-50 py-4 px-3 flex flex-col"
+                className="md:hidden fixed left-0 top-16 bottom-0 w-72 bg-background border-r border-border/60 z-50 py-4 px-3 flex flex-col"
               >
-                <nav className="space-y-1 flex-1">
-                  {NAV.map((item) => {
-                    const active = activeTab === item.tab;
-                    return (
-                      <button
-                        key={item.tab}
-                        onClick={() => goTab(item.tab)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:bg-muted"
-                        }`}
-                      >
-                        <item.icon className="w-4 h-4" />
-                        {item.label}
-                      </button>
-                    );
-                  })}
-                </nav>
+                {renderNav(() => setMobileOpen(false))}
               </motion.aside>
             </>
           )}
@@ -307,14 +359,18 @@ export function DashboardShell() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === "overview" && <OverviewView />}
+              {(activeTab === "overview" || !ALL_TABS.includes(activeTab)) && (
+                <OverviewView />
+              )}
               {activeTab === "menu" && <MenuView />}
               {activeTab === "tables" && <TablesView />}
               {activeTab === "reservations" && <ReservationsView />}
               {activeTab === "calendar" && <CalendarView />}
               {activeTab === "analytics" && <AnalyticsView />}
               {activeTab === "team" && <TeamView />}
-              {activeTab === "settings" && <SettingsView />}
+              {(activeTab === "settings" || activeTab === "account") && (
+                <SettingsView />
+              )}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -346,8 +402,7 @@ function CreateRestaurantDialog({
   const [city, setCity] = useState("");
 
   const mutation = useMutation({
-    mutationFn: () =>
-      api.createRestaurant({ name, cuisine, city }),
+    mutationFn: () => api.createRestaurant({ name, cuisine, city }),
     onSuccess: async () => {
       await onCreated();
       qc.invalidateQueries({ queryKey: ["dashboard"] });

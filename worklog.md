@@ -511,3 +511,60 @@ Priority recommendations for next phase:
 3. Rezervasyon saat çakışma kontrolü (aynı masa aynı saat)
 4. Masa kat planı (görsel floor plan editor)
 5. Audit log (kim ne zaman hangi değişikliği yaptı)
+
+---
+Task ID: admin-dashboard-1
+Agent: main
+Task: Admin dashboard'u spec'e uyumlulaştır — sidebar yapısı, 4 kart, empty state, /admin alias
+
+Work Log:
+- Mevcut dashboard-shell.tsx ve overview-view.tsx okundu
+- **Dashboard API güncellendi** (`/api/dashboard`):
+  - `todayGuests`: bugünkü rezervasyonların guestCount toplamı (yeni)
+  - `activeTables`: inactive olmayan masaların sayısı (yeni)
+  - counts'a `activeTables` eklendi, reservations'a `todayGuests` eklendi
+- **DashboardStats tipi güncellendi**: `counts.activeTables` + `reservations.todayGuests`
+- **Router'a /admin alias eklendi**: `/#/admin` ve `/#/admin/menu` → dashboard route'una map. Spec: /login → /admin
+- **Sidebar yeniden yapılandırıldı** (spec: Dashboard, Rezervasyonlar, Masalar, Menü, Restoran, Ayarlar + alt: Profil, Çıkış Yap):
+  - Ana grup: Dashboard, Rezervasyonlar, Masalar, Menü, Restoran (Store icon, settings view)
+  - "İş Araçları" grubu: Takvim, Analitik, Ekip (önceki özellikler korundu)
+  - "Sistem" grubu: Ayarlar
+  - Alt bölüm: Profil (avatar + isim + email) + Çıkış Yap (destructive)
+  - NAV_GROUPS array yapısı, renderNav() shared fonksiyonu (desktop + mobile drawer)
+  - Mobile drawer: responsive, slide-in animasyonlu, overlay
+- **Overview 4 kart spec'e uyumlu**:
+  1. Bugünkü Rezervasyonlar (CalendarCheck, rose) — sub: "X beklemede"
+  2. Aktif Masalar (LayoutGrid, emerald) — sub: "X toplam masa"
+  3. Toplam Menü Ürünü (UtensilsCrossed, orange) — sub: "X kategori"
+  4. Bugünkü Misafir Sayısı (Users, amber) — sub: "X onaylı"
+  - Her kart gerçek DB verisi, dummy data yok
+- **Empty state eklendi** (EmptyStateDashboard component):
+  - Koşul: menuItem=0 AND table=0 AND reservation=0 (fresh restaurant)
+  - "Hoş geldin! Başlayalım 🎉" başlığı + 3 adımlı guided panel:
+    1. Menünü oluştur → /dashboard/menu
+    2. Masalarını ekle → /dashboard/tables
+    3. İlk rezervasyonu al → /dashboard/reservations
+  - Her adım: icon, başlık, açıklama, "Git" butonu
+  - Dashed border, primary tint, premium görünüm
+- Top navbar korundu: restaurant switcher, public link, theme toggle, user avatar menu
+
+Stage Summary:
+- ✅ Sidebar spec uyumlu: Dashboard/Rezervasyonlar/Masalar/Menü/Restoran (ana) + Takvim/Analitik/Ekip (İş Araçları) + Ayarlar (Sistem) + alt: Profil/Çıkış Yap
+- ✅ 4 dashboard kartı spec'teki gibi: Bugünkü Rezervasyonlar, Aktif Masalar, Toplam Menü Ürünü, Bugünkü Misafir Sayısı
+- ✅ /admin alias çalışıyor (/#/admin ve /#/admin/menu)
+- ✅ Real DB data (dummy yok): Le Petit Bistro'da kartlar 3/7/13/12, Empty Test Cafe'de 0/0/0/0
+- ✅ Empty state: fresh restaurant'ta "Hoş geldin! Başlayalım" + 3 adımlı guided panel
+- ✅ Mobile responsive drawer (slide-in animasyonlu)
+- ✅ Lint: 0 error, 2 warning (RHF watch — zararsız)
+- ✅ Dev log: runtime hatası yok
+- agent-browser ile doğrulandı: sidebar yapısı, kart değerleri, /admin alias, empty state
+
+Unresolved issues / risks:
+- "Restoran" nav item → settings view'i açiyor (restoran profil/ayarlari). İleride ayrı bir "Restoran Profili" view ile "Ayarlar" (account) ayrılabilir.
+- Empty state sadece tamamen boş restoran için. Kısmi boş (sadece menü var, masa yok) için chart'lar boş grid gösterir — kabul edilebilir.
+
+Priority recommendations for next phase:
+1. Restoran Profili ve Hesap Ayarları'nı ayrı view'lere böl
+2. Rezervasyon saat çakışma kontrolü
+3. Masa kat planı (görsel floor plan editor)
+4. Bildirim merkezi (pending reservation alerts)

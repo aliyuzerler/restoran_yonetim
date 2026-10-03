@@ -24,6 +24,10 @@ function parseHash(): Route {
     return { name: "reset-password", token: decodeURIComponent(parts[1]) };
   }
   if (parts[0] === "onboarding") return { name: "onboarding" };
+  // /admin is an alias for /dashboard (spec: /login → /admin)
+  if (parts[0] === "admin") {
+    return { name: "dashboard", tab: parts[1] };
+  }
   if (parts[0] === "dashboard") {
     return { name: "dashboard", tab: parts[1] };
   }
