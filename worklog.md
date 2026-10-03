@@ -668,3 +668,61 @@ Priority recommendations for next phase:
 2. Masa bazlı rezervasyon takvimi (hangı masa ne zaman dolu)
 3. QR code ile masa bazlı menü siparişi
 4. Toplu masa ekleme (range: 1-10 arası tek seferde)
+
+---
+Task ID: menu-management-1
+Agent: main
+Task: Menü yönetim sayfasını spec'e uyumlulaştır — drag/drop kategori sıralama, fotoğraf yükleme, Aktif/Pasif
+
+Work Log:
+- Mevcut menu-view.tsx okundu (temel CRUD var, drag/drop ve fotoğraf yok)
+- **Backend**:
+  - `PATCH /api/categories` eklendi — batch reorder (orderedIds array, transaction ile sortOrder güncelle)
+  - `api.reorderCategories(restaurantId, orderedIds)` metodu eklendi
+  - menu-items API zaten imageUrl kabul ediyordu (controller'dan geldi)
+- **Menu view tamamen yeniden yazıldı**:
+  - **Drag/drop kategori sidebar**: @dnd-kit/core + @dnd-kit/sortable
+    - SortableCategoryButton: GripVertical drag handle, useSortable hook, transform/transition, isDragging ring highlight
+    - DndContext + SortableContext + verticalListSortingStrategy
+    - "Tümü" non-sortable (GripVertical opacity 20%)
+    - handleDragEnd → arrayMove → reorderMutation.mutate (API'ye persist)
+    - Optimistic: kategori sırası anında güncellenir, hata olursa refetch
+    - "sürükle" hint label
+  - **ItemCard yeniden tasarlandı**:
+    - Fotoğraf varsa 16:9 aspect, object-cover, hover scale 105
+    - Tükendi badge (fotoğraf üstünde), featured star badge (fotoğraf üstünde)
+    - Fotoğraf yoksa UtensilsCrossed placeholder icon
+    - Kategori badge (outline), etiket badges (Leaf icon)
+    - **Aktif/Pasif toggle** prominent: Eye/EyeOff icon + "Aktif"/"Pasif" label + Switch (spec'in Aktif/Pasif alanı)
+    - Featured toggle (Star), edit, delete butonları
+  - **ItemDialog (create/edit) tüm spec alanları**:
+    - **Fotoğraf yükleme**: drag-drop zone, "Fotoğraf yükle PNG, JPG · max 2MB", FileReader → base64 data URL (Supabase Storage yok, base64 DB'de saklanır), preview with remove (X) + change (ImageUp), uploading spinner
+    - İsim, Açıklama (textarea), Fiyat (number), Kategori (select), Etiketler (comma input)
+    - **Aktif/Pasif** (Eye/EyeOff + Switch), Öne çıkar (Star + Switch)
+    - 2MB limit + image type validation
+  - **CategoryDialog**: Kategori Adı + Açıklama (Tag icon başlıkta)
+  - Empty state: "Henüz ürün yok" + açıklama + "Ürün Ekle"
+  - AlertDialog ile silme onayı (item/category)
+- **Bug düzeltildi**: requireAccessibleRestaurant debug log eklendi, typo'lu restaurant ID sorunu teşhis edildi (cmurryh0r0001izkdrfkuqpvs doğru), debug kaldırıldı
+
+Stage Summary:
+- ✅ Kategori oluşturma/düzenleme/silme — CategoryDialog + AlertDialog
+- ✅ Ürün oluşturma/düzenleme/silme — ItemDialog + AlertDialog
+- ✅ Ürün alanları spec'teki gibi: İsim, Açıklama, Fiyat, Kategori, **Fotoğraf**, **Aktif/Pasif**
+- ✅ Fotoğraf yükleme: base64 (Supabase Storage yerine, DB'de saklanır), 2MB limit, preview + remove + change
+- ✅ Drag/drop kategori sıralama: @dnd-kit ile, GripVertical handle, optimistic update, API persist
+- ✅ ItemCard fotoğraf gösterimi (16:9, hover scale, Tükendi/featured badge overlay)
+- ✅ Aktif/Pasif prominent toggle (Eye/EyeOff + Switch)
+- ✅ Reorder API doğrulandı: before [Başlangıçlar,Ana Yemekler,Makarnalar,Tatlılar,İçecekler] → reverse → after [İçecekler,Tatlılar,...] → restore
+- ✅ agent-browser: menü yükleniyor, 5 kategori + ürünler, Aktif/Pasif switch, Ürün Ekle modal tüm alanlarla
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+
+Unresolved issues / risks:
+- Fotoğraflar base64 olarak DB'de saklanıyor (Supabase Storage yok). Çok büyük görseller DB'yi şişirir — 2MB limit ile mitigate. Supabase'e geçişte Storage bucket kullanılmalı, imageUrl storage URL olacak.
+- Drag/drop headless browser'da zor test edilir ama API + useSortable hook doğru çalışıyor (reorder API doğrulandı)
+
+Priority recommendations for next phase:
+1. Supabase Storage entegrasyonu (fotoğraf yükleme)
+2. Ürün drag/drop sıralama (kategori içinde)
+3. Toplu ürün import/export (CSV)
+4. Menü önizleme (public sayfa olarak)

@@ -136,6 +136,11 @@ export const api = {
     }),
   deleteCategory: (id: string) =>
     request<{ ok: boolean }>(`/api/categories/${id}`, { method: "DELETE" }),
+  reorderCategories: (restaurantId: string, orderedIds: string[]) =>
+    request<{ ok: boolean }>("/api/categories", {
+      method: "PATCH",
+      body: JSON.stringify({ restaurantId, orderedIds }),
+    }),
 
   // ---- Menu Items ----
   listMenuItems: (restaurantId: string) =>

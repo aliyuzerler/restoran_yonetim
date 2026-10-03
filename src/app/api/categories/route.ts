@@ -55,3 +55,35 @@ export async function POST(req: NextRequest) {
     return errorResponse(e);
   }
 }
+
+// Batch reorder categories (drag/drop)
+const reorderSchema = z.object({
+  restaurantId: z.string().min(1),
+  orderedIds: z.array(z.string()).min(1),
+});
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) throw new ResponseError(401, "Yetkisiz erişim");
+    const body = await req.json();
+    const parsed = reorderSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ResponseError(400, parsed.error.issues[0].message);
+    }
+    await requireAccessibleRestaurant(user.id, parsed.data.restaurantId);
+
+    // Update sortOrder for each category in a transaction
+    await db.$transaction(
+      parsed.data.orderedIds.map((id, idx) =>
+        db.category.update({
+          where: { id },
+          data: { sortOrder: idx },
+        })
+      )
+    );
+    return Response.json({ ok: true });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

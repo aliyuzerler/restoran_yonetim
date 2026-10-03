@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -13,7 +13,30 @@ import {
   Star,
   Search,
   Leaf,
+  ImageIcon,
+  Upload,
+  X,
+  ImageUp,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { api } from "@/lib/api";
 import { useRestaurantStore } from "@/stores/restaurant-store";
 import type { Category, MenuItem } from "@/lib/types";
@@ -52,6 +75,10 @@ import {
 import { formatPrice } from "@/lib/format";
 import { toast } from "sonner";
 
+// ---------------------------------------------------------------------------
+// Main view
+// ---------------------------------------------------------------------------
+
 export function MenuView() {
   const { current } = useRestaurantStore();
   const [selectedCat, setSelectedCat] = useState<string>("all");
@@ -86,9 +113,37 @@ export function MenuView() {
   const categories = catData?.categories ?? [];
   const items = itemData?.items ?? [];
 
+  // Reorder mutation (drag/drop)
+  const reorderMutation = useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      api.reorderCategories(current!.id, orderedIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["categories"] });
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      toast.error("Sıralama kaydedilemedi");
+    },
+  });
+
+  const toggleAvailable = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
+      api.updateMenuItem(id, { isAvailable: value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+
+  const toggleFeatured = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
+      api.updateMenuItem(id, { isFeatured: value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["menu-items"] });
+    },
+  });
+
   const filtered = items.filter((it) => {
-    const catMatch =
-      selectedCat === "all" || it.categoryId === selectedCat;
+    const catMatch = selectedCat === "all" || it.categoryId === selectedCat;
     const sMatch =
       !search ||
       it.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -126,29 +181,30 @@ export function MenuView() {
         ]
       : [{ category: categories.find((c) => c.id === selectedCat)!, items: filtered }];
 
-  const toggleAvailable = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
-      api.updateMenuItem(id, { isAvailable: value }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["menu-items"] });
-    },
-  });
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const toggleFeatured = useMutation({
-    mutationFn: ({ id, value }: { id: string; value: boolean }) =>
-      api.updateMenuItem(id, { isFeatured: value }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["menu-items"] });
-    },
-  });
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = categories.findIndex((c) => c.id === active.id);
+    const newIdx = categories.findIndex((c) => c.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const reordered = arrayMove(categories, oldIdx, newIdx);
+    reorderMutation.mutate(reordered.map((c) => c.id));
+  };
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Menü</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Kategorileri ve ürünleri yönet
+            Kategorileri ve ürünleri yönet · Sürükleyerek sırala
           </p>
         </div>
         <div className="flex gap-2">
@@ -163,39 +219,53 @@ export function MenuView() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[220px_1fr] gap-5">
-        {/* Categories sidebar */}
+      <div className="grid lg:grid-cols-[240px_1fr] gap-5">
+        {/* Categories sidebar — drag/drop sortable */}
         <div>
           <Card className="border-border/60 sticky top-20">
             <CardContent className="p-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 py-1.5">
-                Kategoriler
-              </p>
-              <div className="space-y-0.5">
-                <CategoryButton
-                  active={selectedCat === "all"}
-                  onClick={() => setSelectedCat("all")}
-                  label="Tümü"
-                  count={items.length}
-                />
-                {categories.map((c) => (
-                  <CategoryButton
-                    key={c.id}
-                    active={selectedCat === c.id}
-                    onClick={() => setSelectedCat(c.id)}
-                    label={c.name}
-                    count={
-                      items.filter((it) => it.categoryId === c.id).length
-                    }
-                    onEdit={() => setCatDialog({ open: true, cat: c })}
-                  />
-                ))}
-                {categories.length === 0 && (
-                  <p className="text-xs text-muted-foreground px-2 py-3">
-                    Henüz kategori yok
-                  </p>
-                )}
+              <div className="flex items-center justify-between px-2 py-1.5 mb-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Kategoriler
+                </p>
+                <span className="text-[10px] text-muted-foreground/60">sürükle</span>
               </div>
+              {/* "Tümü" is NOT sortable */}
+              <CategoryButton
+                active={selectedCat === "all"}
+                onClick={() => setSelectedCat("all")}
+                label="Tümü"
+                count={items.length}
+              />
+              {categories.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={categories.map((c) => c.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-0.5 mt-0.5">
+                      {categories.map((c) => (
+                        <SortableCategoryButton
+                          key={c.id}
+                          category={c}
+                          active={selectedCat === c.id}
+                          onClick={() => setSelectedCat(c.id)}
+                          count={items.filter((it) => it.categoryId === c.id).length}
+                          onEdit={() => setCatDialog({ open: true, cat: c })}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <p className="text-xs text-muted-foreground px-2 py-3">
+                  Henüz kategori yok
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -215,13 +285,16 @@ export function MenuView() {
           {filtered.length === 0 ? (
             <Card className="border-dashed border-border/60">
               <CardContent className="py-16 text-center">
-                <UtensilsCrossed className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
+                <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-4">
+                  <UtensilsCrossed className="w-7 h-7 text-primary/40" />
+                </div>
                 <p className="font-medium">Henüz ürün yok</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  İlk ürünü ekleyerek menünü oluşturmaya başla
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                  İlk ürünü ekleyerek menünü oluştur. İsim, açıklama, fiyat,
+                  kategori, fotoğraf ve aktif/pasif ayarlarını belirle.
                 </p>
                 <Button
-                  className="mt-4"
+                  className="mt-5"
                   onClick={() => setItemDialog({ open: true, item: null })}
                 >
                   <Plus className="w-4 h-4 mr-1" />
@@ -253,9 +326,7 @@ export function MenuView() {
                             <ItemCard
                               item={item}
                               currency={current?.currency ?? "₺"}
-                              onEdit={() =>
-                                setItemDialog({ open: true, item })
-                              }
+                              onEdit={() => setItemDialog({ open: true, item })}
                               onDelete={() =>
                                 setDeleteTarget({
                                   type: "item",
@@ -284,9 +355,7 @@ export function MenuView() {
 
       <ItemDialog
         open={itemDialog.open}
-        onOpenChange={(open) =>
-          setItemDialog({ open, item: itemDialog.item })
-        }
+        onOpenChange={(open) => setItemDialog({ open, item: itemDialog.item })}
         item={itemDialog.item}
         categories={categories}
         restaurantId={current?.id ?? ""}
@@ -330,8 +399,7 @@ export function MenuView() {
                     await api.deleteCategory(deleteTarget.id);
                     qc.invalidateQueries({ queryKey: ["categories"] });
                     qc.invalidateQueries({ queryKey: ["menu-items"] });
-                    if (selectedCat === deleteTarget.id)
-                      setSelectedCat("all");
+                    if (selectedCat === deleteTarget.id) setSelectedCat("all");
                   }
                   toast.success("Silindi");
                 } catch (e) {
@@ -349,31 +417,58 @@ export function MenuView() {
   );
 }
 
-function CategoryButton({
+// ---------------------------------------------------------------------------
+// Sortable category button (drag handle)
+// ---------------------------------------------------------------------------
+
+function SortableCategoryButton({
+  category,
   active,
   onClick,
-  label,
   count,
   onEdit,
 }: {
+  category: Category;
   active: boolean;
   onClick: () => void;
-  label: string;
   count: number;
-  onEdit?: () => void;
+  onEdit: () => void;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       className={`group flex items-center justify-between rounded-lg px-2 py-1.5 text-sm cursor-pointer transition-colors ${
         active
           ? "bg-primary text-primary-foreground"
+          : isDragging
+          ? "bg-muted shadow-lg ring-2 ring-primary/30"
           : "hover:bg-muted text-foreground"
       }`}
       onClick={onClick}
     >
-      <span className="flex items-center gap-2 truncate">
-        <GripVertical className="w-3.5 h-3.5 opacity-40 shrink-0" />
-        <span className="truncate">{label}</span>
+      <span className="flex items-center gap-2 truncate min-w-0">
+        <button
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className={`shrink-0 cursor-grab active:cursor-grabbing touch-none ${
+            active ? "text-primary-foreground/70" : "text-muted-foreground/60 hover:text-foreground"
+          }`}
+          aria-label="Sürükle"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <span className="truncate">{category.name}</span>
       </span>
       <span className="flex items-center gap-1 shrink-0">
         <span
@@ -383,21 +478,58 @@ function CategoryButton({
         >
           {count}
         </span>
-        {onEdit && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 transition-opacity"
-          >
-            <Pencil className="w-3 h-3" />
-          </button>
-        )}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 transition-opacity"
+          aria-label="Düzenle"
+        >
+          <Pencil className="w-3 h-3" />
+        </button>
       </span>
     </div>
   );
 }
+
+// Non-sortable category button (for "Tümü")
+function CategoryButton({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-sm cursor-pointer transition-colors ${
+        active ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
+      }`}
+      onClick={onClick}
+    >
+      <span className="flex items-center gap-2 truncate">
+        <GripVertical className="w-3.5 h-3.5 opacity-20 shrink-0" />
+        <span className="truncate">{label}</span>
+      </span>
+      <span
+        className={`text-[10px] tabular-nums ${
+          active ? "text-primary-foreground/70" : "text-muted-foreground"
+        }`}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Item card — shows photo, name, desc, price, category, aktif/pasif
+// ---------------------------------------------------------------------------
 
 function ItemCard({
   item,
@@ -423,14 +555,39 @@ function ItemCard({
         !item.isAvailable ? "opacity-60" : ""
       }`}
     >
+      {/* Photo */}
+      {item.imageUrl ? (
+        <div className="aspect-[16/9] overflow-hidden bg-muted relative">
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          {!item.isAvailable && (
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-medium">
+              Tükendi
+            </div>
+          )}
+          {item.isFeatured && (
+            <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center shadow-md">
+              <Star className="w-3.5 h-3.5 fill-white text-white" />
+            </div>
+          )}
+        </div>
+      ) : null}
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
+          {!item.imageUrl && (
+            <div className="w-12 h-12 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
+              <UtensilsCrossed className="w-5 h-5 text-primary/40" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5">
               <h3 className="font-semibold leading-tight line-clamp-2 flex-1 min-w-0">
                 {item.name}
               </h3>
-              {item.isFeatured && (
+              {item.isFeatured && !item.imageUrl && (
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0 mt-0.5" />
               )}
             </div>
@@ -439,10 +596,15 @@ function ItemCard({
                 {item.description}
               </p>
             )}
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center flex-wrap gap-1.5 mt-2">
               <span className="font-bold text-primary">
                 {formatPrice(item.price, currency)}
               </span>
+              {item.category && (
+                <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal">
+                  {item.category.name}
+                </Badge>
+              )}
               {tags.map((t) => (
                 <Badge
                   key={t}
@@ -485,13 +647,20 @@ function ItemCard({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
+          {/* Aktif/Pasif toggle */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground">
-              {item.isAvailable ? "Müsait" : "Tükendi"}
+            {item.isAvailable ? (
+              <Eye className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+            )}
+            <span className="text-[11px] font-medium">
+              {item.isAvailable ? "Aktif" : "Pasif"}
             </span>
             <Switch
               checked={item.isAvailable}
               onCheckedChange={onToggleAvailable}
+              aria-label="Aktif/Pasif"
             />
           </div>
         </div>
@@ -499,6 +668,10 @@ function ItemCard({
     </Card>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Item create/edit dialog — with photo upload (base64)
+// ---------------------------------------------------------------------------
 
 function ItemDialog({
   open,
@@ -516,18 +689,18 @@ function ItemDialog({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [tags, setTags] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
-
-  // Sync when opening
-  useState(() => {});
-  // use effect substitute
+  const [uploading, setUploading] = useState(false);
   const [lastOpen, setLastOpen] = useState(false);
+
   if (open !== lastOpen) {
     setLastOpen(open);
     if (open) {
@@ -535,11 +708,37 @@ function ItemDialog({
       setDescription(item?.description ?? "");
       setPrice(item ? String(item.price) : "");
       setCategoryId(item?.categoryId ?? "");
+      setImageUrl(item?.imageUrl ?? null);
       setTags(item?.tags ?? "");
       setIsAvailable(item?.isAvailable ?? true);
       setIsFeatured(item?.isFeatured ?? false);
     }
   }
+
+  // Handle file upload — convert to base64 data URL (no Supabase Storage)
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Lütfen bir görsel dosyası seç");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Görsel 2MB'den küçük olmalı");
+      return;
+    }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageUrl(reader.result as string);
+      setUploading(false);
+    };
+    reader.onerror = () => {
+      toast.error("Görsel yüklenemedi");
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -549,13 +748,12 @@ function ItemDialog({
         description: description || undefined,
         price: Number(price) || 0,
         categoryId: categoryId || null,
+        imageUrl: imageUrl || null,
         tags: tags || null,
         isAvailable,
         isFeatured,
       };
-      if (item) {
-        return api.updateMenuItem(item.id, payload);
-      }
+      if (item) return api.updateMenuItem(item.id, payload);
       return api.createMenuItem(payload);
     },
     onSuccess: () => {
@@ -570,14 +768,78 @@ function ItemDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{item ? "Ürünü Düzenle" : "Yeni Ürün"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <UtensilsCrossed className="w-5 h-5 text-primary" />
+            {item ? "Ürünü Düzenle" : "Yeni Ürün"}
+          </DialogTitle>
           <DialogDescription>
-            Menüdeki bir ürünün detaylarını gir
+            İsim, açıklama, fiyat, kategori, fotoğraf ve aktiflik ayarları
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto scrollbar-thin pr-1">
+          {/* Photo upload */}
           <div className="space-y-2">
-            <Label>Ürün Adı</Label>
+            <Label>Fotoğraf</Label>
+            {imageUrl ? (
+              <div className="relative rounded-xl overflow-hidden border border-border/60 aspect-[16/9] group">
+                <img src={imageUrl} alt="Ürün" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(null)}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                  aria-label="Fotoğrafı kaldır"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-black/60 text-white text-xs hover:bg-black/80 transition-colors"
+                >
+                  <ImageUp className="w-3 h-3" />
+                  Değiştir
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full rounded-xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/[0.02] transition-colors py-6 flex flex-col items-center gap-2 text-muted-foreground"
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                    <span className="text-xs">Yükleniyor...</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-foreground">
+                        Fotoğraf yükle
+                      </p>
+                      <p className="text-[11px] mt-0.5">
+                        PNG, JPG · max 2MB
+                      </p>
+                    </div>
+                  </>
+                )}
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>İsim</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -628,21 +890,32 @@ function ItemDialog({
               placeholder="vegan, acılı, glutensiz"
             />
           </div>
+          {/* Aktif/Pasif */}
           <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-            <div>
-              <p className="text-sm font-medium">Müsait</p>
-              <p className="text-xs text-muted-foreground">
-                Müşterilere gösterilsin mi
-              </p>
+            <div className="flex items-center gap-2">
+              {isAvailable ? (
+                <Eye className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <EyeOff className="w-4 h-4 text-muted-foreground" />
+              )}
+              <div>
+                <p className="text-sm font-medium">Aktif</p>
+                <p className="text-xs text-muted-foreground">
+                  Müşterilere gösterilsin mi
+                </p>
+              </div>
             </div>
             <Switch checked={isAvailable} onCheckedChange={setIsAvailable} />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-            <div>
-              <p className="text-sm font-medium">Öne çıkar</p>
-              <p className="text-xs text-muted-foreground">
-                Public sayfada vurgula
-              </p>
+            <div className="flex items-center gap-2">
+              <Star className={`w-4 h-4 ${isFeatured ? "fill-amber-400 text-amber-400" : "text-muted-foreground"}`} />
+              <div>
+                <p className="text-sm font-medium">Öne çıkar</p>
+                <p className="text-xs text-muted-foreground">
+                  Public sayfada vurgula
+                </p>
+              </div>
             </div>
             <Switch checked={isFeatured} onCheckedChange={setIsFeatured} />
           </div>
@@ -662,6 +935,10 @@ function ItemDialog({
     </Dialog>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Category create/edit dialog
+// ---------------------------------------------------------------------------
 
 function CategoryDialog({
   open,
@@ -707,7 +984,8 @@ function CategoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag className="w-5 h-5 text-primary" />
             {category ? "Kategoriyi Düzenle" : "Yeni Kategori"}
           </DialogTitle>
           <DialogDescription>Menü kategorisi oluştur</DialogDescription>
