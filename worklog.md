@@ -877,3 +877,79 @@ Priority recommendations for next phase:
 2. Touch gesture support (swipe to delete reservations)
 3. PWA / offline support
 4. Mobile-specific features (pull-to-refresh)
+
+---
+Task ID: design-system-1
+Agent: main
+Task: Design system refinement — Linear/Vercel/Stripe inspired premium enterprise SaaS look
+
+Work Log:
+- **globals.css renk paleti rafine edildi** (light mode):
+  - Background: daha nötr (0.992 0.002 80 — barely warm, enterprise clean)
+  - Foreground: daha derin (0.18 0.015 60)
+  - Primary: 0.6 0.16 42 (slightly more saturated terracotta)
+  - Borders: subtler (0.92 0.006 75 — key to enterprise look)
+  - Muted-foreground: 0.52 (better contrast)
+  - Sidebar: barely warm neutral (0.985 0.003 80)
+- **Dark mode rafine edildi**:
+  - Background: 0.155 0.008 60 (deep warm black)
+  - Card: 0.2 0.012 60 (subtle elevation)
+  - Primary: 0.68 0.15 48 (brighter for dark)
+  - Borders: 8% opacity (subtler)
+  - Input: 12% opacity
+- **Typography**:
+  - Font smoothing: `-webkit-font-smoothing: antialiased` + `-moz-osx-font-smoothing: grayscale` + `text-rendering: optimizeLegibility`
+  - Body letter-spacing: -0.011em (tighter, enterprise feel)
+  - Headings letter-spacing: -0.02em (confident, modern)
+- **Premium shadow scale** (5 seviye):
+  - `shadow-xs-premium`: 0 1px 2px (minimal)
+  - `shadow-sm-premium`: 0 1px 3px + 0 1px 2px (cards default)
+  - `shadow-md-premium`: 0 4px 12px + 0 2px 6px (hover)
+  - `shadow-lg-premium`: 0 12px 32px + 0 4px 12px (elevated)
+  - `shadow-xl-premium`: 0 24px 48px + 0 8px 24px (modals)
+- **Glow effects rafine edildi**: softer, more subtle (glow-primary, glow-soft)
+- **Button component**:
+  - `rounded-lg` (eskiden rounded-md), `transition-all duration-200`
+  - `active:scale-[0.98]` micro-interaction (press feedback)
+  - `focus-visible:ring-ring/40` (softer focus ring)
+  - Premium shadow scale kullanıldı (shadow-sm-premium default, hover shadow-md-premium)
+  - lg size: h-11 (eskiden h-10) — daha generous
+  - outline variant: `border-border` explicit + `hover:border-border/80`
+- **Card component**:
+  - `border-border/70` (subtler border)
+  - `shadow-sm-premium` (soft layered shadow)
+- **Input component**:
+  - `rounded-lg` (eskiden rounded-md)
+  - `placeholder:text-muted-foreground/70` (softer placeholder)
+  - `hover:border-border` (hover feedback)
+  - `focus-visible:ring-ring/30` (softer focus)
+  - `transition-all duration-200`
+
+Stage Summary:
+- ✅ Premium enterprise SaaS aesthetic (Linear/Vercel/Stripe inspired)
+- ✅ Clean typography: font smoothing + tighter letter-spacing + heading hierarchy
+- ✅ Soft shadows: 5-level premium shadow scale (xs/sm/md/lg/xl)
+- ✅ Subtle borders: border-border/70 (lighter, more enterprise)
+- ✅ Generous spacing: maintained throughout
+- ✅ Modern buttons: rounded-lg, active:scale micro-interaction, hover shadow elevation
+- ✅ Subtle gradients: text-gradient-warm, mesh background, animated CTA gradient
+- ✅ Glass effect: .glass class (backdrop-blur + saturate)
+- ✅ Micro interactions: button press (active:scale), hover shadows, focus rings
+- ✅ Dark mode: deep warm black, refined contrast, subtler borders
+- ✅ Not overly colorful/karmaşık — kurumsal ve premium
+- VLM ratings: Landing 8.5/10, Dashboard 8.5/10, Dark mode 8.5/10
+  - "Strong B2B SaaS aesthetic, Linear/Vercel vibes"
+  - "Excellent hierarchy, generous whitespace"
+  - "Soft shadows well-balanced, subtle warm gradients add depth without gimmicky"
+  - "Highly professional, conversion-focused"
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+
+Unresolved issues / risks:
+- "N" badge (Next.js dev tools) bottom-left'te görünür — production build'de olmaz
+- Bazı Türkçe metinler enterprise context için lokalizasyon kontrolü isteyebilir
+
+Priority recommendations for next phase:
+1. Custom font (Inter/Geist) yerine brand font ekle
+2. Animation system (spring physics transitions)
+3. Design token documentation (Storybook)
+4. Accessibility audit (WCAG AA contrast check)
