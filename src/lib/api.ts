@@ -3,6 +3,8 @@ import type {
   Category,
   DashboardStats,
   MenuItem,
+  Order,
+  OrderStatus,
   Reservation,
   Restaurant,
   RestaurantMember,
@@ -213,6 +215,37 @@ export const api = {
     ),
   publicReservation: (data: Record<string, unknown>) =>
     request<{ reservation: Reservation }>("/api/public/reservations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // ---- Orders (online ordering) ----
+  listOrders: (restaurantId: string, filters?: { status?: string }) => {
+    const params = new URLSearchParams({ restaurantId });
+    if (filters?.status) params.set("status", filters.status);
+    return request<{ orders: Order[] }>(`/api/orders?${params.toString()}`);
+  },
+  createOrder: (data: Record<string, unknown>) =>
+    request<{ order: Order }>("/api/orders", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateOrder: (id: string, data: Record<string, unknown>) =>
+    request<{ order: Order }>(`/api/orders/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  updateOrderStatus: (id: string, status: OrderStatus) =>
+    request<{ order: Order }>(`/api/orders/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  deleteOrder: (id: string) =>
+    request<{ ok: boolean }>(`/api/orders/${id}`, { method: "DELETE" }),
+
+  // Public order (from public restaurant page)
+  publicOrder: (data: Record<string, unknown>) =>
+    request<{ order: Order }>("/api/public/orders", {
       method: "POST",
       body: JSON.stringify(data),
     }),

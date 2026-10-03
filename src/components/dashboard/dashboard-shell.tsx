@@ -21,6 +21,7 @@ import {
   BarChart3,
   Users,
   User as UserIcon,
+  ShoppingBag,
   type LucideIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -59,6 +60,7 @@ import { SettingsView } from "./views/settings-view";
 import { CalendarView } from "./views/calendar-view";
 import { AnalyticsView } from "./views/analytics-view";
 import { TeamView } from "./views/team-view";
+import { OrdersView } from "./views/orders-view";
 
 type NavItem = { tab: string; label: string; icon: LucideIcon };
 type NavGroup = { label?: string; items: NavItem[] };
@@ -70,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { tab: "overview", label: "Dashboard", icon: LayoutDashboard },
       { tab: "reservations", label: "Rezervasyonlar", icon: CalendarCheck },
+      { tab: "orders", label: "Siparişler", icon: ShoppingBag },
       { tab: "tables", label: "Masalar", icon: LayoutGrid },
       { tab: "menu", label: "Menü", icon: UtensilsCrossed },
       { tab: "settings", label: "Restoran", icon: Store },
@@ -365,6 +368,7 @@ export function DashboardShell() {
               {activeTab === "menu" && <MenuView />}
               {activeTab === "tables" && <TablesView />}
               {activeTab === "reservations" && <ReservationsView />}
+              {activeTab === "orders" && <OrdersView />}
               {activeTab === "calendar" && <CalendarView />}
               {activeTab === "analytics" && <AnalyticsView />}
               {activeTab === "team" && <TeamView />}

@@ -91,3 +91,50 @@ export const TIME_SLOTS: string[] = [
   "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
   "21:00", "21:30", "22:00",
 ];
+
+// ---------------------------------------------------------------------------
+// Order statuses (online ordering)
+// ---------------------------------------------------------------------------
+export const ORDER_STATUS: Record<
+  string,
+  { label: string; color: string; description: string }
+> = {
+  pending: {
+    label: "Beklemede",
+    color: "#f59e0b",
+    description: "Sipariş alındı, onay bekliyor",
+  },
+  preparing: {
+    label: "Hazırlanıyor",
+    color: "#3b82f6",
+    description: "Mutfakta hazırlanıyor",
+  },
+  ready: {
+    label: "Hazır",
+    color: "#10b981",
+    description: "Servise hazır",
+  },
+  completed: {
+    label: "Tamamlandı",
+    color: "#6b7280",
+    description: "Teslim edildi",
+  },
+  cancelled: {
+    label: "İptal",
+    color: "#ef4444",
+    description: "İptal edildi",
+  },
+};
+
+export const ORDER_STATUS_ORDER = [
+  "pending",
+  "preparing",
+  "ready",
+  "completed",
+  "cancelled",
+];
+
+export const ORDER_TYPE: Record<string, { label: string; icon: string }> = {
+  dine_in: { label: "Burada Yenir", icon: "🍽️" },
+  takeaway: { label: "Paket", icon: "🥡" },
+};

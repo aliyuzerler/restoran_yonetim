@@ -1082,3 +1082,68 @@ Priority recommendations for next phase:
 2. Add more public restaurant pages to sitemap (dynamic generation)
 3. Set up NEXT_PUBLIC_SITE_URL + NEXT_PUBLIC_BASE_PATH in GitHub repo settings
 4. Add canonical URL tags for each route
+
+---
+Task ID: online-ordering-1
+Agent: main
+Task: Sipariş verme ekranı — public sayfada sepet + checkout, admin panelinde sipariş yönetimi
+
+Work Log:
+- **Prisma şemasına Order + OrderItem modelleri eklendi**:
+  - Order: id, restaurantId, customerName, customerPhone, tableNumber, orderType (dine_in|takeaway), status (pending|preparing|ready|completed|cancelled), total, notes, source (online|manual), items[], createdAt, updatedAt
+  - OrderItem: id, orderId, menuItemId, name (snapshot), price (snapshot), quantity, notes
+  - MenuItem'e orderItems relation eklendi, Restaurant'a orders relation eklendi
+- **Backend API'ler**:
+  - `GET/POST /api/orders` — admin: list + create (RLS scoped)
+  - `PATCH/DELETE /api/orders/[id]` — admin: update status + delete
+  - `POST /api/public/orders` — public: müşteri sipariş oluşturma (slug ile)
+  - Tüm siparişlerde name/price snapshot + total otomatik hesaplanır
+- **Tipler**: Order, OrderItem, OrderStatus, OrderType tipleri eklendi
+- **api.ts**: listOrders, createOrder, updateOrder, updateOrderStatus, deleteOrder, publicOrder metodları
+- **constants.ts**: ORDER_STATUS (5 durum + renk), ORDER_STATUS_ORDER, ORDER_TYPE (dine_in/takeaway)
+- **cart-store.ts** (Zustand): items, add, remove, updateQuantity, updateNotes, clear, setRestaurant, total, count
+  - Persist kaldırıldı (SSR hydration sorunu)
+- **cart-sheet.tsx** (public sayfa için):
+  - CartButton: floating action button (fixed bottom-right), sepette ürün varsa görünür, pulse animasyonu
+  - CartSheet: 3 adımlı flow (cart → checkout → success)
+    - Cart: ürün listesi (fotoğraf, isim, fiyat, quantity +/-, remove), toplam
+    - Checkout: sipariş tipi (Burada Yenir / Paket), Ad Soyad, Telefon, Masa Numarası (dine_in için), notlar, sipariş özeti
+    - Success: "Siparişin alındı!" + "Menüye Dön" butonu
+  - AnimatePresence ile item enter/exit
+- **public-restaurant-page.tsx**:
+  - MenuProductCard'a "Sepete Ekle" butonu eklendi (Tükendi ise disabled)
+  - CartButton sayfaya eklendi (Footer'dan sonra)
+  - useCartStore import edildi
+- **orders-view.tsx** (admin panel):
+  - "Canlı" indicator (10sn polling)
+  - 4 stat card: Beklemede, Hazırlanıyor, Hazır, Günlük Gelir
+  - Filtre sekmeleri: Tümü, Beklemede, Hazırlanıyor, Hazır, Tamamlandı, İptal
+  - OrderRow: order type icon, customer name, type badge, table badge, time, items list, notes, total, status dropdown
+  - Durum değiştirme: 5 durum (pending→preparing→ready→completed→cancelled)
+  - Delete with AlertDialog
+  - Real-time polling (10sn)
+- **dashboard-shell.tsx**: "Siparişler" nav item eklendi (ShoppingBag icon, reservations ile tables arasında)
+
+Stage Summary:
+- ✅ Public sayfada sipariş verme: Sepete Ekle → Sepet → Checkout → Success
+- ✅ Sepet: floating button, ürün listesi, quantity +/-, remove, toplam
+- ✅ Checkout: Sipariş tipi (Burada Yenir/Paket), Ad Soyad, Telefon, Masa No, Notlar
+- ✅ Sipariş DB'ye kaydedilir (Order + OrderItem, name/price snapshot)
+- ✅ Admin panelde anında görünür (10sn polling)
+- ✅ Admin sipariş yönetimi: stat cards, filtreler, durum değiştirme, silme
+- ✅ End-to-end doğrulandı:
+  - Public: "Sepete Ekle" → sepet açıldı (Burrata ₺285) → "Siparişi Tamamla" → form doldur (Ahmet Test, Masa 5) → "Siparişi Gönder" → "Siparişin alındı!"
+  - Admin: "Siparişler" → 2 sipariş göründü (Ahmet Test ₺285 + Test Müşteri ₺890), "Canlı" indicator, filtreler, durum dropdown
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+- Test verileri temizlendi
+
+Unresolved issues / risks:
+- Sepet verisi localStorage'a persist edilmiyor (SSR sorunu nedeniyle kaldırıldı) — sayfa yenilenince sepet boşalır
+- Sipariş saat çakışma kontrolü yok
+- Ödeme entegrasyonu yok (sadece sipariş alma)
+
+Priority recommendations for next phase:
+1. Sepet persist (client-side only, SSR-safe)
+2. Sipariş geçmişi (müşteri tarafı)
+3. Ödeme entegrasyonu (Stripe/Iyzico)
+4. Sipariş bildirim sesi (admin)

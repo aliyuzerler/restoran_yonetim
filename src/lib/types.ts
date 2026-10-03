@@ -168,3 +168,37 @@ export type AnalyticsData = {
   months: { label: string; count: number; guests: number }[];
   sources: { online: number; manual: number };
 };
+
+// ---------------------------------------------------------------------------
+// Orders (online ordering)
+// ---------------------------------------------------------------------------
+
+export type OrderStatus = "pending" | "preparing" | "ready" | "completed" | "cancelled";
+export type OrderType = "dine_in" | "takeaway";
+
+export type OrderItem = {
+  id: string;
+  orderId: string;
+  menuItemId: string | null;
+  name: string;
+  price: number;
+  quantity: number;
+  notes: string | null;
+};
+
+export type Order = {
+  id: string;
+  restaurantId: string;
+  customerName: string;
+  customerPhone: string | null;
+  tableNumber: string | null;
+  orderType: OrderType;
+  status: OrderStatus;
+  total: number;
+  notes: string | null;
+  source: string;
+  items: OrderItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+

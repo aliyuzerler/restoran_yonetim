@@ -92,6 +92,7 @@ model Restaurant {
   members       RestaurantMember[]
   categories    Category[]
   menuItems     MenuItem[]
+  orders        Order[]
   tables        Table[]
   reservations  Reservation[]
 
@@ -156,6 +157,8 @@ model MenuItem {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  orderItems   OrderItem[]
+
   @@index([restaurantId])
   @@index([categoryId])
 }
@@ -217,4 +220,51 @@ model Reservation {
   @@index([userId])
   @@index([status])
   @@index([reservationDate])
+}
+
+// ---------------------------------------------------------------------------
+// Orders (online ordering from public restaurant page)
+// ---------------------------------------------------------------------------
+
+// orders: id, restaurant_id, customer_name, customer_phone, table_number,
+// order_type, status, total, notes, created_at, updated_at
+// order_type: dine_in | takeaway
+// status: pending | preparing | ready | completed | cancelled
+model Order {
+  id            String   @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerName  String
+  customerPhone String?
+  tableNumber   String?  // for dine_in (e.g., "5")
+  orderType     String   @default("dine_in") // dine_in | takeaway
+  status        String   @default("pending") // pending | preparing | ready | completed | cancelled
+  total         Float    @default(0)
+  notes         String?
+  source        String   @default("online") // online | manual
+  items         OrderItem[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([restaurantId])
+  @@index([status])
+  @@index([orderType])
+  @@index([createdAt])
+}
+
+// order_items: id, order_id, menu_item_id, name, price, quantity, notes
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String?
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  name       String   // snapshot of item name at order time
+  price      Float    // snapshot of item price at order time
+  quantity   Int      @default(1)
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+  @@index([menuItemId])
 }

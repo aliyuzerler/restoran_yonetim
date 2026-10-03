@@ -19,12 +19,15 @@ import {
   CheckCircle2,
   ExternalLink,
   Navigation,
+  Plus,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNavigate } from "@/lib/router";
 import type { MenuItem, Category } from "@/lib/types";
+import { useCartStore } from "@/stores/cart-store";
 import { Logo } from "@/components/layout/logo";
 import { Footer } from "@/components/layout/footer";
+import { CartButton } from "./cart-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -127,7 +130,7 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
       const el = document.getElementById("restaurant-jsonld");
       if (el) el.remove();
     };
-  }, [data]);
+  }, [data?.restaurant?.id, data?.restaurant?.name, data?.restaurant?.description]);
 
   if (isLoading) {
     return (
@@ -401,6 +404,9 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
 
       <Footer />
 
+      {/* Floating cart button + sheet (online ordering) */}
+      <CartButton slug={slug} />
+
       <ReservationDialog
         open={resOpen}
         onOpenChange={setResOpen}
@@ -562,6 +568,7 @@ function MenuProductCard({
   const tags = item.tags
     ? item.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
+  const add = useCartStore((s) => s.add);
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -593,13 +600,13 @@ function MenuProductCard({
               {item.description}
             </p>
           )}
-          {/* Fiyat + tags */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
+          {/* Fiyat + tags + add button */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40 gap-2">
             <span className="font-bold text-primary text-base">
               {formatPrice(item.price, currency)}
             </span>
             {tags.length > 0 && (
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 {tags.map((t) => (
                   <Badge key={t} variant="outline" className="text-[10px] gap-0.5 py-0 px-1.5">
                     <Leaf className="w-2.5 h-2.5" />
@@ -609,6 +616,22 @@ function MenuProductCard({
               </div>
             )}
           </div>
+          {/* Sepete Ekle butonu */}
+          <Button
+            size="sm"
+            className="w-full mt-3"
+            disabled={!item.isAvailable}
+            onClick={() => add(item)}
+          >
+            {item.isAvailable ? (
+              <>
+                <Plus className="w-4 h-4 mr-1" />
+                Sepete Ekle
+              </>
+            ) : (
+              "Tükendi"
+            )}
+          </Button>
         </CardContent>
       </Card>
     </motion.div>
