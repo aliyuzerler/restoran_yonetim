@@ -953,3 +953,70 @@ Priority recommendations for next phase:
 2. Animation system (spring physics transitions)
 3. Design token documentation (Storybook)
 4. Accessibility audit (WCAG AA contrast check)
+
+---
+Task ID: component-architecture-1
+Agent: main
+Task: Temiz component architecture — services, hooks, types, utils + Supabase client + state views
+
+Work Log:
+- **Supabase client** (`src/lib/supabase.ts`):
+  - Central single-file client — `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` env vars
+  - `isSupabaseConfigured` flag — gracefully null when credentials absent
+  - `getSupabase()` lazy-creates client only when configured (dynamic import)
+  - Service role key NEVER imported — only anon key
+  - Currently falls back to Prisma REST API (src/lib/api.ts)
+- **Service layer** (`src/services/`):
+  - `authService.ts` — me, login, register, logout, forgotPassword, verifyResetToken, resetPassword
+  - `restaurantService.ts` — list, get, create, update, remove + members (list/add/update/remove) + dashboard + analytics
+  - `reservationService.ts` — list, create, update, updateStatus, remove, publicCreate
+  - `menuService.ts` — categories (list/create/update/delete/reorder) + items (list/create/update/toggleAvailable/toggleFeatured/delete)
+  - `tableService.ts` — list, create, update, updateStatus, remove
+  - `index.ts` — barrel export
+  - Her service, `api.ts`'i wrap eder. Supabase'e geçişte sadece bu dosyalar değişir, çağrı yerleri aynı kalır.
+- **Hooks layer** (`src/hooks/`):
+  - `useAuth.ts` — user, loading, initialized, isAuthenticated, login, register, logout
+  - `useRestaurant.ts` — useRestaurants (list + current + isEmpty), useDashboardStats (15s polling + isEmpty), useAnalytics
+  - `useReservations.ts` — useReservations (10s polling + isEmpty), useCreate/Update/UpdateStatus/DeleteReservation, usePublicReservation
+  - `useMenu.ts` — useCategories (isEmpty), useMenuItems (isEmpty), useCreate/Update/Delete/Reorder + useToggleAvailable/Featured
+  - `useTables.ts` — useTables (isEmpty), useCreate/Update/UpdateStatus/DeleteTable
+  - `index.ts` — barrel export
+  - Her hook loading/error/empty state döner: `{ data, isLoading, isError, error, isEmpty, refetch }`
+- **Types** (`src/types/index.ts`) — re-export from lib/types
+- **Utils** (`src/utils/index.ts`) — re-export format, cn, slugify, constants
+- **State views** (`src/components/ui/state-views.tsx`):
+  - `LoadingState` — spinner + message
+  - `ErrorState` — AlertCircle + message + retry button
+  - `EmptyState` — icon + title + description + action button (motion spring)
+  - `SkeletonGrid` — loading skeleton grid (count + className configurable)
+  - `QueryState` — smart wrapper: isLoading→skeleton, isError→ErrorState, isEmpty→EmptyState, else children
+- Mevcut tüm view'lar zaten proper empty states'e sahip (audit edildi):
+  - Overview: "Hoş geldin! Başlayalım" (guided onboarding)
+  - Reservations: "Rezervasyon bulunamadı" + "Filtreleri temizle"
+  - Menu: "Henüz ürün yok" + "Ürün Ekle"
+  - Tables: "Henüz masa yok" + "İlk Masayı Ekle"
+  - Calendar: empty day detail
+  - Analytics: "Henüz veri yok"
+  - Team: read-only banner for non-owners
+
+Stage Summary:
+- ✅ Clean architecture: services/ + hooks/ + types/ + utils/ + lib/supabase.ts
+- ✅ Supabase client central, env-based, service_role never in frontend
+- ✅ Service layer wraps API — Supabase migration only changes services, not call sites
+- ✅ Hooks layer: every hook returns { isLoading, isError, error, isEmpty, refetch }
+- ✅ State views: reusable LoadingState, ErrorState, EmptyState, SkeletonGrid, QueryState
+- ✅ All views already have proper empty states (audited)
+- ✅ App still works end-to-end (agent-browser verified: login → dashboard → all cards render)
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+- NOT done: full file reorganization (pages/ folder, component subfolder split) — too risky for working app, current structure is functional
+
+Unresolved issues / risks:
+- Services/hooks are new layers that wrap existing api.ts — existing views still use api.ts directly. Refactoring views to use hooks is a gradual migration.
+- Full pages/ folder structure not created (would require moving all page components + updating imports — high risk)
+- Supabase env vars not set (credentials absent) — client returns null, falls back to Prisma
+
+Priority recommendations for next phase:
+1. Gradually migrate views to use hooks (useReservations, useMenu, useTables) instead of direct api calls
+2. Create pages/ folder structure when doing a major refactor
+3. Set up Supabase project + migrate (services layer ready)
+4. Add ErrorBoundary component for route-level error catching
