@@ -45,6 +45,16 @@ export const RESERVATION_STATUS_ORDER: ReservationStatus[] = [
   "no_show",
 ];
 
+// The 4 spec statuses for the reservations management UI
+// (Pending, Confirmed, Cancelled, Completed). Seated/no_show are kept as
+// extended statuses but the primary quick-status menu shows these four.
+export const RESERVATION_STATUS_SPEC: ReservationStatus[] = [
+  "pending",
+  "confirmed",
+  "cancelled",
+  "completed",
+];
+
 export const TABLE_STATUS: Record<
   TableStatus,
   { label: string; color: string; dot: string }

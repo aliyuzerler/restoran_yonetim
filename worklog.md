@@ -568,3 +568,49 @@ Priority recommendations for next phase:
 2. Rezervasyon saat çakışma kontrolü
 3. Masa kat planı (görsel floor plan editor)
 4. Bildirim merkezi (pending reservation alerts)
+
+---
+Task ID: reservations-management-1
+Agent: main
+Task: Rezervasyon yönetim sayfasını spec'e uyumlulaştır — tablo görünümü, 4 durum, spec filtreleri
+
+Work Log:
+- Mevcut reservations-view.tsx okundu (kart tabanlı, eski filtreler)
+- constants.ts'e `RESERVATION_STATUS_SPEC` eklendi: spec'in 4 durumu (pending, confirmed, cancelled, completed) — quick-status menüsü için. Seated/no_show "Diğer" altında korunuyor.
+- **Reservations view tamamen yeniden yazıldı**:
+  - **Tablo görünümü** (desktop lg+): shadcn Table component ile 8 kolon: Müşteri (avatar + isim + online/notes), Telefon, Tarih (Bugün/short date + relative), Saat, Kişi (Users icon), Masa (badge), Durum (clickable dropdown), İşlem (edit/delete)
+  - **Mobil kart görünümü** (lg breakpoint altı): compact card with time block + customer info + status dropdown
+  - **Tarih filtreleri** (spec): Bugün, Yarın, Bu hafta (Pzt-Paz), Tarih seç (date picker), Tümü — her birinde count badge
+  - **Durum filtresi** (ayrı dropdown): "Durum: Tümü" button → tüm durumlar + count, seçili durumu renkli gösterir, "Durum filtresini temizle" ghost button
+  - **Arama**: müşteri adı veya telefon ile search input
+  - **Kombine filtreleme**: tarih + durum + search birlikte çalışır
+  - **Durum değiştirme** (inline): Durum hücresine tıkla → dropdown → 4 spec durumu (Beklemede, Onaylandı, İptal, Tamamlandı) + "Diğer" altında Masada/Gelmedi. Mevcut durum disabled.
+  - **Rezervasyon oluşturma modalı**: Ad Soyad, Kişi Sayısı, Telefon, E-posta, Tarih, Saat (time slots), Masa (select), Durum (select), Notlar — Kaydet disabled until required fields filled
+  - **Edit/Delete**: İşlem kolonundaki ⋮ dropdown → Düzenle / Sil (AlertDialog ile确认)
+  - **Empty state**: rezervasyon yoksa "Rezervasyon bulunamadı" + "Yeni Rezervasyon" butonu; filtre sonucu boşsa "Filtreleri temizle" butonu
+  - **Sonuç sayısı**: "X rezervasyon gösteriliyor"
+  - useMutation ile status update → invalidate reservations + dashboard queries
+  - AnimatePresence ile row enter/exit animations
+
+Stage Summary:
+- ✅ Tablo kolonları spec'teki gibi: Müşteri, Telefon, Tarih, Saat, Kişi, Masa, Durum (+ İşlem)
+- ✅ Durum değiştirme: 4 spec durumu (Pending, Confirmed, Cancelled, Completed) quick menüde + extended (Seated, No-show) "Diğer" altında
+- ✅ Tarih filtreleri: Bugün (3), Yarın (2), Bu hafta (5), Tarih seç (date picker), Tümü (7)
+- ✅ Durum filtresi: ayrı dropdown, tüm durumlar + count, renkli indicator
+- ✅ Arama: müşteri adı / telefon
+- ✅ Kombine filtreleme çalışıyor: "Yarın" + "Beklemede" = 1 sonuç (Can Öztürk)
+- ✅ Rezervasyon oluşturma modalı tüm alanlarla
+- ✅ Empty state + "Filtreleri temizle" butonu
+- ✅ Responsive: desktop table + mobile cards
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+- agent-browser ile doğrulandı: tablo kolonları, filtreler, durum değiştirme (Onaylandı→Tamamlandı→Onaylandı), Yarın filtresi, status filter, combined filtering, create modal
+
+Unresolved issues / risks:
+- "Bu hafta" Pazartesi-Pazar olarak hesaplanıyor (ISO week). İleride haftanın başlangıç günü ayarlanabilir.
+- Tarih seç date picker native HTML5 — daha premium bir calendar picker eklenebilir
+
+Priority recommendations for next phase:
+1. Rezervasyon saat çakışma kontrolü (aynı masa aynı saat)
+2. Toplu durum güncelleme (checkbox ile çoklu seçim)
+3. Rezervasyon detay paneli (side drawer)
+4. CSV/export özelliği
