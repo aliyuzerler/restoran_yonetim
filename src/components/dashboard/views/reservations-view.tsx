@@ -282,8 +282,8 @@ export function ReservationsView() {
       </div>
 
       {/* Date filter tabs (spec: Bugün, Yarın, Bu hafta, Tarih seç) */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin">
+      <div className="flex flex-wrap items-center gap-2 mb-4 max-w-full">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-thin max-w-full pb-1">
           {DATE_FILTERS.map((f) => (
             <button
               key={f.key}

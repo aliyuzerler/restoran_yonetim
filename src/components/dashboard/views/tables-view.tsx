@@ -487,7 +487,7 @@ function TableCard({
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
               Durumu değiştir
             </p>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-1.5">
               {QUICK_STATUSES.map((s) => {
                 const sc = TABLE_STATUS[s];
                 const active = table.status === s;
@@ -496,7 +496,7 @@ function TableCard({
                     key={s}
                     onClick={() => onStatus(s)}
                     title={sc.label}
-                    className={`flex flex-col items-center gap-1 py-1.5 rounded-md transition-all ${
+                    className={`flex flex-col items-center gap-1 py-2 min-h-[44px] rounded-md transition-all ${
                       active
                         ? "bg-muted"
                         : "hover:bg-muted/60 opacity-60 hover:opacity-100"

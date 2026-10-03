@@ -133,7 +133,7 @@ export function DashboardShell() {
                       goTab(item.tab);
                       onNav?.();
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       active
                         ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                         : "text-foreground/70 hover:bg-muted hover:text-foreground"
@@ -186,7 +186,7 @@ export function DashboardShell() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background overflow-x-hidden">
       {/* Top navbar */}
       <header className="sticky top-0 z-30 h-16 border-b border-border/60 bg-background/80 backdrop-blur-lg flex items-center gap-3 px-4 sm:px-6">
         <button
@@ -204,7 +204,7 @@ export function DashboardShell() {
         {/* Restaurant switcher */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 max-w-[240px]">
+            <Button variant="outline" size="sm" className="gap-2 max-w-[140px] sm:max-w-[200px] md:max-w-[240px]">
               <Store className="w-4 h-4 text-primary shrink-0" />
               <span className="truncate font-medium">
                 {current?.name ?? "Restoran seç"}
@@ -350,7 +350,7 @@ export function DashboardShell() {
         </AnimatePresence>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab + (current?.id ?? "")}
