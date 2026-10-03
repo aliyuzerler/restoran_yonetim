@@ -1,11 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { useNavigate } from "@/lib/router";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -31,6 +43,8 @@ type FormData = z.infer<typeof schema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -39,18 +53,21 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: (data: FormData) => api.login(data.email, data.password),
+    onMutate: () => setError(null),
     onSuccess: ({ user }) => {
       setUser(user);
       toast.success(`Hoş geldin, ${user.name}!`);
       navigate("/dashboard");
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      setError(e.message);
+    },
   });
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background bg-mesh">
       <header className="h-16 border-b border-border/60 flex items-center px-4 sm:px-6">
-        <button onClick={() => navigate("/")}>
+        <button onClick={() => navigate("/")} className="hover:opacity-80 transition-opacity">
           <Logo />
         </button>
       </header>
@@ -79,6 +96,33 @@ export function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Inline error banner */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                      <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium text-destructive">Giriş başarısız</p>
+                        <p className="text-destructive/80 text-xs mt-0.5">{error}</p>
+                      </div>
+                      <button
+                        onClick={() => setError(null)}
+                        className="text-destructive/60 hover:text-destructive shrink-0"
+                        aria-label="Kapat"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <form
                 onSubmit={form.handleSubmit((d) => mutation.mutate(d))}
                 className="space-y-4"
@@ -90,30 +134,52 @@ export function LoginPage() {
                     <Input
                       type="email"
                       placeholder="ornek@restoran.com"
-                      className="pl-9"
+                      className={`pl-9 ${form.formState.errors.email ? "border-destructive/50 focus-visible:ring-destructive/20" : ""}`}
+                      disabled={mutation.isPending}
                       {...form.register("email")}
                     />
                   </div>
                   {form.formState.errors.email && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
                       {form.formState.errors.email.message}
                     </p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Şifre</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Şifre</label>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/forgot-password")}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      Şifremi unuttum
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
-                      className="pl-9"
+                      className={`pl-9 pr-9 ${form.formState.errors.password ? "border-destructive/50 focus-visible:ring-destructive/20" : ""}`}
+                      disabled={mutation.isPending}
                       {...form.register("password")}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                   {form.formState.errors.password && (
-                    <p className="text-xs text-destructive">
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
                       {form.formState.errors.password.message}
                     </p>
                   )}
@@ -121,11 +187,20 @@ export function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11"
+                  className="w-full h-11 group"
                   disabled={mutation.isPending}
                 >
-                  {mutation.isPending ? "Giriş yapılıyor..." : "Giriş Yap"}
-                  {!mutation.isPending && <ArrowRight className="w-4 h-4 ml-1" />}
+                  {mutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      Giriş yapılıyor...
+                    </>
+                  ) : (
+                    <>
+                      Giriş Yap
+                      <ArrowRight className="w-4 h-4 ml-1.5 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
                 </Button>
               </form>
 

@@ -19,9 +19,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sessions     Session[]
-  restaurants  Restaurant[]
-  reservations Reservation[]
+  sessions       Session[]
+  restaurants    Restaurant[]
+  reservations   Reservation[]
+  passwordResets PasswordReset[]
 }
 
 model Session {
@@ -33,6 +34,20 @@ model Session {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  email     String   // the user email this reset is for
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
 }
 
 model Restaurant {

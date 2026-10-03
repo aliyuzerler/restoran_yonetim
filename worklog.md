@@ -187,3 +187,82 @@ Priority recommendations for next phase:
 3. Rezervasyon saat çakışma kontrolü
 4. Landing'e testimonial / sosyal kanıt bölümü ekle
 5. Gerçek sipariş/satış takibi ile analitik gelir verisini doğru yap
+
+---
+Task ID: auth-flow-1
+Agent: main
+Task: Authentication akışını güçlendir — Şifre Tekrar, Şifremi Unuttum, şifre sıfırlama, loading/error/success state'leri
+
+Work Log:
+- Mevcut login/register page'leri ve router okundu
+- Prisma şemasına `PasswordReset` modeli eklendi (token, email, userId, expiresAt, usedAt) + db:push
+- Backend API'leri:
+  - `POST /api/auth/forgot-password` — email alır, kullanıcı varsa token üretir (1 saat geçerli), eski token'ları invalid eder. Email enumeration önlemek için her zaman ok döner. Dev modunda token'ı response'da döner (e-posta sağlayıcısı yok).
+  - `POST /api/auth/reset-password` — token + yeni şifre alır, token geçerliliğini kontrol eder (usedAt, expiresAt), şifreyi günceller, tüm session'ları siler (force re-login).
+  - `GET /api/auth/reset-password?token=X` — token geçerliliğini kontrol eder (reset page load'da).
+- Router'a `forgot-password` ve `reset-password` (token parametreli) route'ları eklendi
+- api.ts'e `forgotPassword`, `verifyResetToken`, `resetPassword` metodları eklendi
+- **Login page yeniden yazıldı**:
+  - E-posta, Şifre, Giriş Yap butonu (loading spinner'lı)
+  - **Şifremi unuttum** linki (şifre label'ının yanında)
+  - **Hemen kayıt ol** linki
+  - Show/hide password toggle (Eye/EyeOff ikonları)
+  - Inline error banner (AnimatePresence ile slide-in, "Giriş başarısız" + hata mesajı, kapatma butonu)
+  - Field-level error'lar (AlertCircle ikonlu, destructive border)
+  - Loading state: buton'da Loader2 spinner + "Giriş yapılıyor..." + field'lar disabled
+- **Register page yeniden yazıldı**:
+  - Ad Soyad, E-posta, Şifre, **Şifre Tekrar** (4 field)
+  - Zod `.refine()` ile şifre eşleşme kontrolü → "Şifreler eşleşmiyor"
+  - **Password strength meter**: 4 bar (Çok zayıf/Zayıf/Orta/İyi/Güçlü), 4 check listesi (En az 6 karakter, Büyük harf, Küçük harf, Rakam) — Check/X ikonlu, renkli
+  - Eşleşme başarılı → yeşil "Şifreler eşleşiyor" feedback
+  - Inline error + success banner'ları (AnimatePresence)
+  - Kullanım Şartları / Gizlilik Politikası linkleri (kabul metni)
+  - Loading + success state (600ms success banner sonra onboarding'e redirect)
+- **ForgotPassword page** oluşturuldu:
+  - KeyRound ikonlu başlık, e-posta input
+  - Submit → success state: CheckCircle2 animasyonu, "Bağlantı gönderildi" mesajı
+  - Dev modu: token'ı input'ta göster + kopyala butonu + "Sıfırlama sayfasına git" butonu
+  - Email enumeration koruması: email var olmasa bile aynı success mesajı
+- **ResetPassword page** oluşturuldu:
+  - Token verify (useQuery ile mount'ta) — 3 state: verifying (spinner), invalid (AlertCircle + "Yeni bağlantı iste" butonu), valid (form)
+  - Yeni Şifre + Şifre Tekrar (same strength meter + eşleşme kontrolü)
+  - Success state: "Şifren güncellendi!" + "Giriş Yap" buton
+  - Tüm session'lar sıfırlama sonrası silinir (güvenlik)
+- **page.tsx orchestrator** güncellendi:
+  - `forgot-password` route → authenticated user dashboard'a redirect
+  - `reset-password` route → token-based, auth'dan bağımsız (kullanıcı giriş yapmış olsa bile)
+
+Stage Summary:
+- ✅ Login: E-posta + Şifre + Giriş Yap + **Şifremi unuttum** + **Kayıt Ol** — tüm field'lar mevcut
+- ✅ Register: Ad Soyad + E-posta + Şifre + **Şifre Tekrar** — Zod refine ile eşleşme kontrolü
+- ✅ Loading state: tüm formlarda spinner + disabled + "Giriş yapılıyor/Hesap oluşturuluyor/Kaydediliyor..."
+- ✅ Error state: inline banner (AnimatePresence) + field-level (AlertCircle) + toast
+- ✅ Success state: register'da banner + redirect, forgot/reset'te CheckCircle2 animasyonlu success ekranı
+- ✅ Zod validation: email format, min length, password match (refine)
+- ✅ Password strength meter (4 kriter + 4 bar + label)
+- ✅ Show/hide password (Eye/EyeOff)
+- ✅ Auth flow: authenticated → dashboard, unauthenticated → login (mevcut mantık korundu)
+- ✅ Şifre sıfırlama: forgot → token üret → reset → şifre güncelle → session'ları sil → login'e yönlendir
+- ✅ agent-browser ile tüm akışlar doğrulandı:
+  - Login doğru şifre → dashboard ✓
+  - Login yanlış şifre → inline "Giriş başarısız / E-posta veya şifre hatalı" ✓
+  - Forgot password → success + dev token ✓
+  - Reset password → "Şifren güncellendi!" ✓
+  - Yeni şifreyle login → dashboard ✓
+  - Register şifre uyuşmazlığı → "Şifreler eşleşmiyor" ✓
+  - Register success → onboarding redirect ✓
+  - Password strength "Güçlü" + 4 check ✓
+- ✅ Lint: 0 error, 2 warning (React Hook Form watch() — beklenen, zararsız)
+- ✅ Demo şifre demo1234'a geri yüklendi (test sonrası)
+
+Unresolved issues / risks:
+- E-posta sağlayıcısı yok → forgot-password dev modunda token'ı UI'da gösteriyor (production'da e-posta gönderilmeli, token response'da olmamalı)
+- Şifre sıfırlama linki şu an hash-based route ile (`/#/reset-password/TOKEN`) — production'da e-posta linki tam URL olmalı
+- Supabase Auth kullanılmadı (credentials yok) — Prisma + bcrypt + httpOnly cookie session kullanıldı, API contract aynı kaldığı için ileride Supabase'e geçiş kolay
+
+Priority recommendations for next phase:
+1. E-posta gönderimi entegre et (Resend/Nodemailer) → forgot-password gerçek e-posta göndersin
+2. Personel/rol yönetimi (owner/staff davet)
+3. Sosyal login (Google/GitHub OAuth)
+4. Email doğrulama (register sonrası)
+5. 2FA opsiyonel

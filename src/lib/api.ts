@@ -42,6 +42,23 @@ export const api = {
     }),
   logout: () =>
     request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+  forgotPassword: (email: string) =>
+    request<{ ok: boolean; devToken?: string; devNote?: string }>(
+      "/api/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }
+    ),
+  verifyResetToken: (token: string) =>
+    request<{ valid: boolean; email?: string }>(
+      `/api/auth/reset-password?token=${encodeURIComponent(token)}`
+    ),
+  resetPassword: (token: string, password: string) =>
+    request<{ ok: boolean }>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
   seed: () =>
     request<{ ok: boolean; restaurant: { slug: string } }>("/api/seed", {
       method: "POST",

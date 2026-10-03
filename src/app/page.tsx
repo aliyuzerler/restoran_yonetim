@@ -7,6 +7,8 @@ import { useRestaurantStore } from "@/stores/restaurant-store";
 import { LandingPage } from "@/components/landing/landing-page";
 import { LoginPage } from "@/components/auth/login-page";
 import { RegisterPage } from "@/components/auth/register-page";
+import { ForgotPasswordPage } from "@/components/auth/forgot-password-page";
+import { ResetPasswordPage } from "@/components/auth/reset-password-page";
 import { OnboardingPage } from "@/components/auth/onboarding-page";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PublicRestaurantPage } from "@/components/public/public-restaurant-page";
@@ -44,6 +46,20 @@ export default function Home() {
       return <DashboardShell />;
     }
     return route.name === "login" ? <LoginPage /> : <RegisterPage />;
+  }
+
+  // Forgot password: redirect to dashboard if already logged in
+  if (route.name === "forgot-password") {
+    if (user) {
+      if (restaurants.length === 0) return <OnboardingPage />;
+      return <DashboardShell />;
+    }
+    return <ForgotPasswordPage />;
+  }
+
+  // Reset password: accessible regardless of auth (token-based)
+  if (route.name === "reset-password") {
+    return <ResetPasswordPage token={route.token} />;
   }
 
   // Onboarding: requires auth

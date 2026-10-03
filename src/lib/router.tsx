@@ -6,6 +6,8 @@ export type Route =
   | { name: "landing" }
   | { name: "login" }
   | { name: "register" }
+  | { name: "forgot-password" }
+  | { name: "reset-password"; token: string }
   | { name: "onboarding" }
   | { name: "dashboard"; tab?: string }
   | { name: "public-restaurant"; slug: string };
@@ -13,10 +15,14 @@ export type Route =
 function parseHash(): Route {
   const hash = window.location.hash.replace(/^#/, "");
   if (!hash || hash === "/") return { name: "landing" };
-  const parts = hash.split("/").filter(Boolean); // ["login"] or ["r","slug"] or ["dashboard"] or ["dashboard","menu"]
+  const parts = hash.split("/").filter(Boolean);
   if (parts.length === 0) return { name: "landing" };
   if (parts[0] === "login") return { name: "login" };
   if (parts[0] === "register") return { name: "register" };
+  if (parts[0] === "forgot-password") return { name: "forgot-password" };
+  if (parts[0] === "reset-password" && parts[1]) {
+    return { name: "reset-password", token: decodeURIComponent(parts[1]) };
+  }
   if (parts[0] === "onboarding") return { name: "onboarding" };
   if (parts[0] === "dashboard") {
     return { name: "dashboard", tab: parts[1] };
@@ -60,6 +66,10 @@ export function buildPath(route: Route): string {
       return "/login";
     case "register":
       return "/register";
+    case "forgot-password":
+      return "/forgot-password";
+    case "reset-password":
+      return `/reset-password/${route.token}`;
     case "onboarding":
       return "/onboarding";
     case "dashboard":
