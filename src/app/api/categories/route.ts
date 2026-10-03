@@ -4,22 +4,16 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
-
-async function ensureOwned(restaurantId: string, userId: string) {
-  const r = await db.restaurant.findFirst({
-    where: { id: restaurantId, ownerId: userId },
-  });
-  if (!r) throw new ResponseError(404, "Restoran bulunamadı");
-  return r;
-}
 
 const createSchema = z.object({
   restaurantId: z.string().min(1),
   name: z.string().min(1, "Kategori adı gerekli"),
   description: z.string().optional(),
   sortOrder: z.number().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -29,7 +23,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const restaurantId = searchParams.get("restaurantId");
     if (!restaurantId) throw new ResponseError(400, "restaurantId gerekli");
-    await ensureOwned(restaurantId, user.id);
+    await requireAccessibleRestaurant(user.id, restaurantId);
 
     const categories = await db.category.findMany({
       where: { restaurantId },
@@ -51,7 +45,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       throw new ResponseError(400, parsed.error.issues[0].message);
     }
-    await ensureOwned(parsed.data.restaurantId, user.id);
+    await requireAccessibleRestaurant(user.id, parsed.data.restaurantId);
 
     const category = await db.category.create({
       data: parsed.data,

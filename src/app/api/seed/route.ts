@@ -1,16 +1,15 @@
 import { db } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword, errorResponse } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
-import { errorResponse } from "@/lib/auth";
 
 export async function POST() {
   try {
-    // Demo user
-    let user = await db.user.findUnique({
+    // Demo owner
+    let owner = await db.user.findUnique({
       where: { email: "demo@restoran.app" },
     });
-    if (!user) {
-      user = await db.user.create({
+    if (!owner) {
+      owner = await db.user.create({
         data: {
           name: "Demo Restoran Sahibi",
           email: "demo@restoran.app",
@@ -20,9 +19,24 @@ export async function POST() {
       });
     }
 
+    // Demo staff member (showcase restaurant_members table)
+    let staff = await db.user.findUnique({
+      where: { email: "garson@lepetitbistro.com" },
+    });
+    if (!staff) {
+      staff = await db.user.create({
+        data: {
+          name: "Ali Garson",
+          email: "garson@lepetitbistro.com",
+          passwordHash: await hashPassword("staff1234"),
+          role: "staff",
+        },
+      });
+    }
+
     // Demo restaurant
     let restaurant = await db.restaurant.findFirst({
-      where: { ownerId: user.id },
+      where: { ownerId: owner.id },
     });
     if (!restaurant) {
       restaurant = await db.restaurant.create({
@@ -39,14 +53,27 @@ export async function POST() {
           openTime: "12:00",
           closeTime: "23:00",
           currency: "₺",
-          ownerId: user.id,
-          coverImage:
+          ownerId: owner.id,
+          coverImageUrl:
             "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1600&q=80",
-          logoImage:
+          logoUrl:
             "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&q=80",
         },
       });
     }
+
+    // Make the demo staff a member of the restaurant (RLS: they can now access it)
+    await db.restaurantMember.upsert({
+      where: {
+        restaurantId_userId: { restaurantId: restaurant.id, userId: staff.id },
+      },
+      update: { role: "staff" },
+      create: {
+        restaurantId: restaurant.id,
+        userId: staff.id,
+        role: "staff",
+      },
+    });
 
     // Categories
     const catData = [
@@ -189,21 +216,21 @@ export async function POST() {
       }
     }
 
-    // Tables
+    // Tables — tableNumber replaces name; status includes spec's "inactive"
     const tableData = [
-      { name: "Masa 1", capacity: 2, location: "Pencere Kenarı", status: "available" },
-      { name: "Masa 2", capacity: 2, location: "Pencere Kenarı", status: "available" },
-      { name: "Masa 3", capacity: 4, location: "İç Salon", status: "occupied" },
-      { name: "Masa 4", capacity: 4, location: "İç Salon", status: "available" },
-      { name: "Masa 5", capacity: 6, location: "İç Salon", status: "reserved" },
-      { name: "Masa 6", capacity: 2, location: "Teras", status: "available" },
-      { name: "Masa 7", capacity: 4, location: "Teras", status: "cleaning" },
-      { name: "Masa 8", capacity: 8, location: "VIP Salon", status: "available" },
+      { tableNumber: "1", capacity: 2, location: "Pencere Kenarı", status: "available" },
+      { tableNumber: "2", capacity: 2, location: "Pencere Kenarı", status: "available" },
+      { tableNumber: "3", capacity: 4, location: "İç Salon", status: "occupied" },
+      { tableNumber: "4", capacity: 4, location: "İç Salon", status: "available" },
+      { tableNumber: "5", capacity: 6, location: "İç Salon", status: "reserved" },
+      { tableNumber: "6", capacity: 2, location: "Teras", status: "available" },
+      { tableNumber: "7", capacity: 4, location: "Teras", status: "cleaning" },
+      { tableNumber: "8", capacity: 8, location: "VIP Salon", status: "inactive" },
     ];
     const tables = [];
     for (const t of tableData) {
       let table = await db.table.findFirst({
-        where: { restaurantId: restaurant.id, name: t.name },
+        where: { restaurantId: restaurant.id, tableNumber: t.tableNumber },
       });
       if (!table) {
         table = await db.table.create({
@@ -213,7 +240,7 @@ export async function POST() {
       tables.push(table);
     }
 
-    // Reservations (today + upcoming)
+    // Reservations — guestCount/reservationDate/reservationTime replace old names
     const today = new Date().toISOString().slice(0, 10);
     const tomorrow = new Date(Date.now() + 86400000)
       .toISOString()
@@ -246,8 +273,8 @@ export async function POST() {
         where: {
           restaurantId: restaurant.id,
           customerName: r.name,
-          date: r.date,
-          time: r.time,
+          reservationDate: r.date,
+          reservationTime: r.time,
         },
       });
       if (!exists) {
@@ -255,14 +282,14 @@ export async function POST() {
           data: {
             customerName: r.name,
             customerPhone: r.phone,
-            partySize: r.size,
-            date: r.date,
-            time: r.time,
+            guestCount: r.size,
+            reservationDate: r.date,
+            reservationTime: r.time,
             status: r.status,
             notes: r.notes ?? null,
             tableId: r.tableIdx !== undefined ? tables[r.tableIdx].id : null,
             restaurantId: restaurant.id,
-            userId: user.id,
+            userId: owner.id,
             source: "manual",
           },
         });
@@ -272,7 +299,10 @@ export async function POST() {
     return Response.json({
       ok: true,
       restaurant: { slug: restaurant.slug, name: restaurant.name },
-      credentials: { email: "demo@restoran.app", password: "demo1234" },
+      credentials: [
+        { email: "demo@restoran.app", password: "demo1234", role: "owner" },
+        { email: "garson@lepetitbistro.com", password: "staff1234", role: "staff" },
+      ],
     });
   } catch (e) {
     return errorResponse(e);

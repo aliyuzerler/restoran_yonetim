@@ -8,9 +8,9 @@ const schema = z.object({
   customerName: z.string().min(1, "Ad soyad gerekli"),
   customerPhone: z.string().optional().nullable(),
   customerEmail: z.string().optional().nullable(),
-  partySize: z.number().int().min(1, "Kişi sayısı en az 1 olmalı"),
-  date: z.string().min(1, "Tarih gerekli"),
-  time: z.string().min(1, "Saat gerekli"),
+  guestCount: z.number().int().min(1, "Kişi sayısı en az 1 olmalı"),
+  reservationDate: z.string().min(1, "Tarih gerekli"),
+  reservationTime: z.string().min(1, "Saat gerekli"),
   tableId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });

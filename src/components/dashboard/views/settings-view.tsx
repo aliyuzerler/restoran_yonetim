@@ -57,8 +57,8 @@ export function SettingsView() {
     email: current?.email ?? "",
     address: current?.address ?? "",
     city: current?.city ?? "",
-    coverImage: current?.coverImage ?? "",
-    logoImage: current?.logoImage ?? "",
+    coverImageUrl: current?.coverImageUrl ?? "",
+    logoUrl: current?.logoUrl ?? "",
     openTime: current?.openTime ?? "12:00",
     closeTime: current?.closeTime ?? "23:00",
     currency: current?.currency ?? "₺",
@@ -280,14 +280,14 @@ export function SettingsView() {
             <div className="space-y-2">
               <Label>Kapak Görseli URL</Label>
               <Input
-                value={form.coverImage}
-                onChange={(e) => update("coverImage", e.target.value)}
+                value={form.coverImageUrl}
+                onChange={(e) => update("coverImageUrl", e.target.value)}
                 placeholder="https://..."
               />
-              {form.coverImage && (
+              {form.coverImageUrl && (
                 <div className="mt-2 rounded-lg overflow-hidden border border-border/60 aspect-[16/6]">
                   <img
-                    src={form.coverImage}
+                    src={form.coverImageUrl}
                     alt="Kapak"
                     className="w-full h-full object-cover"
                   />
@@ -297,8 +297,8 @@ export function SettingsView() {
             <div className="space-y-2">
               <Label>Logo Görseli URL</Label>
               <Input
-                value={form.logoImage}
-                onChange={(e) => update("logoImage", e.target.value)}
+                value={form.logoUrl}
+                onChange={(e) => update("logoUrl", e.target.value)}
                 placeholder="https://..."
               />
             </div>

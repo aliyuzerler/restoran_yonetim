@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  getRoleForRestaurant,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 
@@ -13,9 +15,9 @@ const updateSchema = z.object({
   customerName: z.string().min(1).optional(),
   customerPhone: z.string().optional().nullable(),
   customerEmail: z.string().optional().nullable(),
-  partySize: z.number().int().min(1).optional(),
-  date: z.string().min(1).optional(),
-  time: z.string().min(1).optional(),
+  guestCount: z.number().int().min(1).optional(),
+  reservationDate: z.string().min(1).optional(),
+  reservationTime: z.string().min(1).optional(),
   tableId: z.string().optional().nullable(),
   status: z
     .enum([
@@ -40,9 +42,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!res || res.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Rezervasyon bulunamadı");
-    }
+    if (!res) throw new ResponseError(404, "Rezervasyon bulunamadı");
+
+    // Staff can edit reservations — only access is required.
+    await requireAccessibleRestaurant(user.id, res.restaurantId);
 
     const body = await req.json();
     const parsed = updateSchema.safeParse(body);
@@ -84,8 +87,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!res || res.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Rezervasyon bulunamadı");
+    if (!res) throw new ResponseError(404, "Rezervasyon bulunamadı");
+
+    await requireAccessibleRestaurant(user.id, res.restaurantId);
+
+    // Only owner or manager can delete reservations.
+    const role = await getRoleForRestaurant(user.id, res.restaurantId);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
     }
 
     await db.reservation.delete({ where: { id } });

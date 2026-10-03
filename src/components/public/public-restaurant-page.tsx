@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNavigate } from "@/lib/router";
+import type { MenuItem } from "@/lib/types";
 import { Logo } from "@/components/layout/logo";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -122,9 +123,9 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
 
       {/* Cover */}
       <div className="relative h-48 sm:h-64 lg:h-80 overflow-hidden bg-muted">
-        {restaurant.coverImage ? (
+        {restaurant.coverImageUrl ? (
           <img
-            src={restaurant.coverImage}
+            src={restaurant.coverImageUrl}
             alt={restaurant.name}
             className="w-full h-full object-cover"
           />
@@ -145,9 +146,9 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
             <CardContent className="p-5 sm:p-7">
               <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-                  {restaurant.logoImage ? (
+                  {restaurant.logoUrl ? (
                     <img
-                      src={restaurant.logoImage}
+                      src={restaurant.logoUrl}
                       alt=""
                       className="w-full h-full object-cover"
                     />
@@ -279,7 +280,7 @@ function FeaturedCard({
   item,
   currency,
 }: {
-  item: ReturnType<typeof api.publicRestaurant> extends Promise<{ restaurant: { menuItems: infer T } }> ? T[number] : never;
+  item: MenuItem;
   currency: string;
 }) {
   const tags = item.tags
@@ -292,10 +293,10 @@ function FeaturedCard({
       viewport={{ once: true }}
     >
       <Card className="overflow-hidden border-border/60 hover:shadow-lg transition-shadow group h-full">
-        {item.image && (
+        {item.imageUrl && (
           <div className="aspect-[16/10] overflow-hidden bg-muted">
             <img
-              src={item.image}
+              src={item.imageUrl}
               alt={item.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
@@ -336,7 +337,7 @@ function MenuItemRow({
   item,
   currency,
 }: {
-  item: ReturnType<typeof api.publicRestaurant> extends Promise<{ restaurant: { menuItems: infer T } }> ? T[number] : never;
+  item: MenuItem;
   currency: string;
 }) {
   const tags = item.tags
@@ -344,9 +345,9 @@ function MenuItemRow({
     : [];
   return (
     <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors">
-      {item.image ? (
+      {item.imageUrl ? (
         <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0">
-          <img src={item.image} alt="" className="w-full h-full object-cover" />
+          <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
         </div>
       ) : (
         <div className="w-14 h-14 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
@@ -389,14 +390,14 @@ function ReservationDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   slug: string;
-  tables: { id: string; name: string; capacity: number; status: string }[];
+  tables: { id: string; tableNumber: string; capacity: number; status: string }[];
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [partySize, setPartySize] = useState("2");
-  const [date, setDate] = useState(todayISO());
-  const [time, setTime] = useState("19:00");
+  const [guestCount, setGuestCount] = useState("2");
+  const [reservationDate, setReservationDate] = useState(todayISO());
+  const [reservationTime, setReservationTime] = useState("19:00");
   const [tableId, setTableId] = useState("");
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
@@ -416,9 +417,9 @@ function ReservationDialog({
         customerName: name,
         customerPhone: phone || null,
         customerEmail: email || null,
-        partySize: Number(partySize) || 1,
-        date,
-        time,
+        guestCount: Number(guestCount) || 1,
+        reservationDate,
+        reservationTime,
         tableId: tableId || null,
         notes: notes || null,
       }),
@@ -440,9 +441,9 @@ function ReservationDialog({
           setName("");
           setPhone("");
           setEmail("");
-          setPartySize("2");
-          setDate(todayISO());
-          setTime("19:00");
+          setGuestCount("2");
+          setReservationDate(todayISO());
+          setReservationTime("19:00");
           setTableId("");
           setNotes("");
         }
@@ -467,15 +468,15 @@ function ReservationDialog({
             <div className="mt-4 rounded-lg bg-muted/50 p-3 text-left text-sm">
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground">Tarih</span>
-                <span className="font-medium">{date}</span>
+                <span className="font-medium">{reservationDate}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground">Saat</span>
-                <span className="font-medium">{time}</span>
+                <span className="font-medium">{reservationTime}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-muted-foreground">Kişi</span>
-                <span className="font-medium">{partySize}</span>
+                <span className="font-medium">{guestCount}</span>
               </div>
             </div>
             <Button className="mt-5 w-full" onClick={() => onOpenChange(false)}>
@@ -507,8 +508,8 @@ function ReservationDialog({
                     <Input
                       type="number"
                       min={1}
-                      value={partySize}
-                      onChange={(e) => setPartySize(e.target.value)}
+                      value={guestCount}
+                      onChange={(e) => setGuestCount(e.target.value)}
                       className="pl-9"
                     />
                   </div>
@@ -538,14 +539,14 @@ function ReservationDialog({
                   <Label>Tarih</Label>
                   <Input
                     type="date"
-                    value={date}
+                    value={reservationDate}
                     min={todayISO()}
-                    onChange={(e) => setDate(e.target.value)}
+                    onChange={(e) => setReservationDate(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Saat</Label>
-                  <Select value={time} onValueChange={setTime}>
+                  <Select value={reservationTime} onValueChange={setReservationTime}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -569,7 +570,7 @@ function ReservationDialog({
                     <SelectContent>
                       {availableTables.map((t) => (
                         <SelectItem key={t.id} value={t.id}>
-                          {t.name} ({t.capacity} kişilik)
+                          Masa {t.tableNumber} ({t.capacity} kişilik)
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -592,7 +593,7 @@ function ReservationDialog({
               </Button>
               <Button
                 onClick={() => mutation.mutate()}
-                disabled={!name || !date || !time || mutation.isPending}
+                disabled={!name || !reservationDate || !reservationTime || mutation.isPending}
               >
                 {mutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-1 animate-spin" />

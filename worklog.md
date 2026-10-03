@@ -266,3 +266,248 @@ Priority recommendations for next phase:
 3. Sosyal login (Google/GitHub OAuth)
 4. Email doğrulama (register sonrası)
 5. 2FA opsiyonel
+
+---
+Task ID: db-api-routes-1
+Agent: general-purpose
+Task: Update ALL API route handlers to use new Prisma field names (camelCase aligned with Supabase spec) and enforce RLS-equivalent tenant isolation via new auth helpers (getAccessibleRestaurantIds / getAccessibleRestaurants / requireAccessibleRestaurant / getRoleForRestaurant).
+
+Work Log:
+- worklog.md okundu (önceki aşamalar: stabil MVP, auth flow, landing, analytics/calendar/QR ekleri)
+- prisma/schema.prisma okundu — yeni alan adları doğrulandı (coverImageUrl, logoUrl, imageUrl, tableNumber, guestCount, reservationDate, reservationTime, Category.isActive, Table.status inactive+cleaning)
+- src/lib/auth.ts okundu — yeni RLS helper imzaları doğrulandı
+- 10 API route handler dosyası güncellendi:
+  1. `restaurants/route.ts` — GET: getAccessibleRestaurants + id filtreli findMany + _count + userRole mapping (boş liste short-circuit). POST: create + RestaurantMember role="owner" otomatik oluştur. Schema coverImageUrl/logoUrl.
+  2. `restaurants/[id]/route.ts` — GET/PATCH/DELETE: requireAccessibleRestaurant. PATCH+DELETE: getRoleForRestaurant → staff ise 403 "Bu işlem için yetkiniz yok". Schema coverImageUrl/logoUrl.
+  3. `categories/route.ts` + `[id]/route.ts` — ensureOwned kaldırıldı → requireAccessibleRestaurant. [id] PATCH+DELETE: role check (staff 403). create/update schema'ya isActive eklendi.
+  4. `menu-items/route.ts` + `[id]/route.ts` — requireAccessibleRestaurant + role check. image → imageUrl (schema + create/update data).
+  5. `tables/route.ts` + `[id]/route.ts` — requireAccessibleRestaurant + role check. name → tableNumber. Status enum'a "inactive" eklendi: z.enum(["available","occupied","reserved","inactive","cleaning"]). orderBy tableNumber.
+  6. `reservations/route.ts` + `[id]/route.ts` — requireAccessibleRestaurant. POST: sadece erişim yeterli (staff oluşturabilir). PATCH: sadece erişim (staff düzenleyebilir). DELETE: manager/owner only (role check 403). partySize→guestCount, date→reservationDate, time→reservationTime (schema + where + orderBy + filter).
+  7. `dashboard/route.ts` — requireAccessibleRestaurant. Bugünkü filtre: r.reservationDate === today. byDay: r.reservationDate === ds. upcoming sort: a.reservationTime.localeCompare(b.reservationTime).
+  8. `analytics/route.ts` — requireAccessibleRestaurant. r.time→r.reservationTime (busy hour bucket). r.partySize→r.guestCount (3 hesap: total, realized, completed). r.date→r.reservationDate (ay filtre). popularity: imageUrl alanı eklendi.
+  9. `public/restaurants/[slug]/route.ts` — auth yok (public). categories where: { isActive: true }. tables orderBy tableNumber. Field isimleri zaten Prisma'dan geliyor (coverImageUrl, logoUrl, imageUrl).
+  10. `public/reservations/route.ts` — auth yok. Schema: guestCount, reservationDate, reservationTime.
+- Tüm `ensureOwned` helper'ları kaldırıldı (grep ile doğrulandı: 0 match).
+- Tüm eski alan adı referansları kaldırıldı (grep coverImage/logoImage/partySize: sadece coverImageUrl doğru referanslar kaldı).
+- `bun run lint` çalıştırıldı → 0 error, 2 warning (önceden var olan React Hook Form watch() uyarıları, auth-flow-1'den beri var, zararsız).
+- `bunx tsc --noEmit` çalıştırıldı → API route dosyalarında 0 hata. Kalan hatalar: examples/websocket (proje dışı), skills/* (proje dışı), auth/forgot-password (dokunulmadı), seed/route (dokunulmadı), frontend components (dokunulmadı).
+
+Stage Summary:
+- ✅ 10 API route dosyası yeni şema ile uyumlu (coverImageUrl, logoUrl, imageUrl, tableNumber, guestCount, reservationDate, reservationTime, Category.isActive, Table.status inactive).
+- ✅ RLS-equivalent tenant isolation tüm auth'lı endpoint'lerde uygulanmış:
+  - Restaurant listesi: kullanıcının owner OR member olduğu restoranlar (getAccessibleRestaurants).
+  - Tekil restaurant erişimi: requireAccessibleRestaurant (var olmayan veya erişilemez restoran için 404 — existence leak yok).
+  - Tüm child kaynaklar (kategori, menü, masa, rezervasyon): önce kaydı bul → restaurantId → requireAccessibleRestaurant.
+- ✅ Rol bazlı yetkilendirme:
+  - Restaurant PATCH/DELETE: owner+manager only (staff 403).
+  - Kategori/Meni/Masa PATCH/DELETE: owner+manager only (staff 403).
+  - Rezervasyon POST+PATCH: tüm erişilebilir kullanıcılar (staff dahil — iş tanımı).
+  - Rezervasyon DELETE: owner+manager only (staff 403).
+- ✅ Restaurant oluşturma sonrası otomatik RestaurantMember(role="owner") ekleniyor → RLS helper'ları yeni restoranı hemen tanıyor.
+- ✅ Restaurant listesinde her objede userRole alanı var (owner | manager | staff).
+- ✅ Frontend tipleri/api.ts/components dokunulmadı (ayrı task'ta güncellenecek).
+- ✅ Auth route'ları (login/register/me/logout/forgot-password/reset-password) dokunulmadı.
+- ✅ Seed route dokunulmadı (zaten güncel).
+- ✅ Lint temiz (0 error). TS hataları sadece dokunulmayan dosyalarda.
+
+Unresolved issues / risks:
+- Frontend (types.ts, api.ts, components) hâlâ eski alan adlarını (partySize, date, time, image, name, coverImage, logoImage) bekliyor — bu task'in kapsamı dışında, ayrı task'ta güncellenecek. Bu nedenle UI'da geçici olarak alan okuma uyumsuzlukları olabilir (frontend güncellenene kadar).
+- Public restoran sayfasında Category.isActive filtresi eklendi — eski seed verilerinde tüm kategoriler active olduğu için sorun yok, ama yeni kategoriler için create endpoint varsayılan isActive=true ile geliyor.
+- Restaurant POST sonrası çift query (create + member create) transaction'a alınmadı — Prisma SQLite'ta $transaction destekli ama basit tutmak için arkışık bırakıldı; olası partial failure durumunda orphan restaurant kalabilir (ilgili race condition nadir).
+
+---
+Task ID: db-frontend-1
+Agent: general-purpose
+Task: Frontend'i yeni Prisma şema alan adlarına (db-api-routes-1'de rename edilen) göre güncelle + Team/Members yönetim sayfasını ve backend API'sini ekle.
+
+Work Log:
+- worklog.md okundu — db-api-routes-1 task'ında API route'ları yeni alan adlarına (coverImageUrl, logoUrl, imageUrl, tableNumber, guestCount, reservationDate, reservationTime, Category.isActive, Table.status inactive) geçirilmiş; frontend dokunulmamış.
+- Tüm frontend dosyaları okundu: types.ts, api.ts, constants.ts, auth.ts, dashboard-shell.tsx, tüm dashboard view'ları (overview, menu, tables, reservations, settings, calendar, analytics), public-restaurant-page.tsx, router.tsx, auth-store.ts, restaurant-store.ts.
+- Mevcut API route pattern'leri (restaurants/[id], categories, menu-items) incelendi; members API aynı pattern'i takip edecek.
+- prisma/schema.prisma okundu — yeni alan adları ve RestaurantMember modeli doğrulandı.
+
+- **src/lib/types.ts** güncellendi:
+  - Restaurant: `coverImage`→`coverImageUrl`, `logoImage`→`logoUrl`, `userRole?: RestaurantRole` eklendi.
+  - Category: `isActive: boolean` eklendi.
+  - MenuItem: `image`→`imageUrl`.
+  - Table: `name`→`tableNumber`; TableStatus'e `"inactive"` eklendi.
+  - Reservation: `partySize`→`guestCount`, `date`→`reservationDate`, `time`→`reservationTime`.
+  - Yeni `RestaurantRole = "owner"|"manager"|"staff"` tipi eklendi.
+  - Yeni `RestaurantMember` tipi eklendi (id, restaurantId, userId, role, createdAt, user?{id,name,email}).
+
+- **src/lib/api.ts** güncellendi:
+  - `RestaurantMember`, `RestaurantRole` import'ları eklendi.
+  - Yeni 4 metod eklendi: `listMembers`, `addMember(email, role)`, `updateMember(memberId, role)`, `removeMember(memberId)` — hepsi `/api/restaurants/${restaurantId}/members` endpoint'ini çağırıyor.
+
+- **src/lib/constants.ts** güncellendi:
+  - TABLE_STATUS'a `inactive: { label: "Pasif", color: "#9ca3af", dot: "bg-gray-400" }` eklendi (mevcut 4 durum korundu).
+
+- **src/components/dashboard/views/overview-view.tsx** güncellendi:
+  - `r.time`→`r.reservationTime`, `r.partySize`→`r.guestCount`, `r.table.name`→`Masa ${r.table.tableNumber}`.
+  - `data.reservations.byDay` chart datapoint'leri (kendi `date` key'ini kullanıyor) dokunulmadı.
+
+- **src/components/dashboard/views/menu-view.tsx** güncellendi:
+  - "Diğer" sentetik kategorisine `isActive: true` eklendi (Category tipi şimdi bunu gerektiriyor).
+  - `item.image` referansı yoktu (ItemCard görsel göstermiyor) — değişiklik gerekmedi.
+
+- **src/components/dashboard/views/tables-view.tsx** güncellendi:
+  - `t.name`→`Masa ${t.tableNumber}` (görüntüleme), AlertDialogDescription'ta `deleteId?.name`→`Masa ${deleteId?.tableNumber}`.
+  - TableDialog state: `name`/`setName`→`tableNumber`/`setTableNumber`, payload `name`→`tableNumber`, Label "Masa Adı"→"Masa Numarası", placeholder "Masa 1"→"1".
+  - TableDialog status select: Object.keys(TABLE_STATUS) üzerinden iterate edildiği için `inactive` otomatik eklendi.
+
+- **src/components/dashboard/views/reservations-view.tsx** güncellendi:
+  - Filter: `r.date`→`r.reservationDate`, `r.date >= today`→`r.reservationDate >= today`.
+  - Sort: `a.date + a.time`→`a.reservationDate + a.reservationTime`.
+  - groupBy: `r.date`→`r.reservationDate`.
+  - Filter chip count'lar: `r.date === today`→`r.reservationDate === today` vb.
+  - AlertDialogDescription: `deleteId?.date`/`deleteId?.time`→`reservationDate`/`reservationTime`.
+  - ReservationRow: `res.time`→`res.reservationTime`, `res.partySize`→`res.guestCount`, `res.table.name`→`Masa ${res.table.tableNumber}`.
+  - ReservationDialog state: `partySize`→`guestCount`, `date`→`reservationDate`, `time`→`reservationTime`, payload alan adları güncellendi, tables dropdown `t.name`→`Masa ${t.tableNumber}`, disabled şartı `!date || !time`→`!reservationDate || !reservationTime`.
+
+- **src/components/dashboard/views/settings-view.tsx** güncellendi:
+  - Form state: `coverImage`/`logoImage`→`coverImageUrl`/`logoUrl`, `current?.coverImage`/`current?.logoImage` okumaları güncellendi.
+  - Input value/onChange handler'ları, kapak preview `src`, label referansları güncellendi.
+
+- **src/components/dashboard/views/calendar-view.tsx** güncellendi:
+  - countsByDay: `r.date`→`r.reservationDate`.
+  - monthReservations: `r.date.split("-")`→`r.reservationDate.split("-")`.
+  - monthGuests: `r.partySize`→`r.guestCount`.
+  - selectedDayReservations: `r.date === selectedDay`→`r.reservationDate === selectedDay`, sort `a.time`→`a.reservationTime`.
+  - Calendar grid preview: `r.date === cell.iso`→`r.reservationDate === cell.iso`, `r.time`→`r.reservationTime`.
+  - Day detail dialog: `r.time`→`r.reservationTime`, `r.partySize`→`r.guestCount`, `r.table.name`→`Masa ${r.table.tableNumber}`.
+  - Bonus: pre-existing TS hatası `cell.iso < todayIso` (null narrowing) düzeltildi → `cell.iso! < todayIso`.
+
+- **src/components/dashboard/views/analytics-view.tsx** dokunulmadı — sadece `/api/analytics` response'unu kullanıyor (KPI'lar, busyHours, popularity, categoryStats, months, sources). Backend zaten `guestCount`/`reservationTime`/`reservationDate` alanlarını response'da doğru isimlerle döndürüyor (db-api-routes-1 task'ında güncellenmişti).
+
+- **src/components/public/public-restaurant-page.tsx** güncellendi:
+  - `restaurant.coverImage`→`restaurant.coverImageUrl`, `restaurant.logoImage`→`restaurant.logoUrl`.
+  - FeaturedCard + MenuItemRow'da `item.image`→`item.imageUrl` (her iki yerde: card cover + row thumbnail).
+  - ReservationDialog state: `partySize`→`guestCount`, `date`→`reservationDate`, `time`→`reservationTime`; mutation payload alan adları güncellendi; reset fonksiyonu güncellendi; success ekranı text'leri güncellendi; form input value/onChange'ler güncellendi; disabled şartı `!date || !time`→`!reservationDate || !reservationTime`.
+  - Tables dropdown `t.name`→`Masa ${t.tableNumber}` (hem ReservationDialog tables prop tipi hem de SelectItem).
+  - Bonus: `T[number]` conditional type syntax'ı sadeleştirildi → direkt `MenuItem` tipi kullanıldı (TS hatası giderildi).
+
+- **src/components/dashboard/dashboard-shell.tsx** güncellendi:
+  - `Users` import edildi (lucide-react).
+  - `TeamView` import edildi (./views/team-view).
+  - NAV array'ine `{ tab: "team", label: "Ekip", icon: Users }` eklendi (Ayarlar'dan önce — task spec'e göre "Ayarlar ve end" arasına).
+  - Render conditional: `{activeTab === "team" && <TeamView />}` eklendi.
+
+- **src/components/dashboard/views/team-view.tsx** (YENİ DOSYA) oluşturuldu:
+  - useQuery ile `api.listMembers(current.id)` çağrılır, queryKey `["members", current?.id]`.
+  - "Üye Ekle" butonu → AddMemberDialog (email + role select manager/staff), api.addMember çağrılır, invalidate `["members"]`.
+  - Üye satırı: Avatar (initials), isim, "Sen" badge (current user), e-posta, rol rozeti/badge.
+  - Owner satırı: Crown ikonlu "Sahip" badge, rol değiştirilemez, kaldırılamaz.
+  - Owner olmayan üyeler (manager/staff): rol Select dropdown (manager↔staff geçiş), Trash2 kaldır butonu.
+  - updateRole mutation (api.updateMember), removeMember mutation (api.removeMember) — ikisi de invalidate `["members"]`.
+  - Yetki kontrolü: `current.userRole === "owner"` değilse "Bu sayfayı görüntüleme yetkiniz yok" banner'ı + liste salt okunur (Select/Trash butonları gizli).
+  - "Bu restorandaki rolün" banner'ı mevcut kullanıcının rolünü gösterir.
+  - AlertDialog ile kaldırma onayı, Loader2 spinner'ları, toast feedback'ler.
+  - ROLE_META: owner (Crown, amber), manager (Shield, primary), staff (UserCog, muted) — renkler ve ikonlar.
+  - Stilling diğer view'lar ile tutarlı (Card, CardHeader, CardTitle, Badge, Avatar, AlertDialog, Dialog, Select, Input, Label, Button).
+
+- **src/app/api/restaurants/[id]/members/route.ts** (YENİ DOSYA) oluşturuldu:
+  - GET: `requireAccessibleRestaurant(user.id, id)` → restaurant + owner çekilir, `db.restaurantMember.findMany` (user info include). Owner için sentetik `{id: "owner-${ownerId}", role: "owner", user: restaurant.owner}` üyesi listenin başına eklenir. Response: `{ members: [...] }`.
+  - POST: `getRoleForRestaurant` → owner değilse 403. Schema: `{email, role: enum(manager,staff)}`. User email ile aranır (lowercase) — bulunamazsa 404 "Kullanıcı bulunamadı. Önce kayıt olmalı.". Restoran owner'ını eklemeye çalışırsa 400 "Bu kullanıcı zaten restoranın sahibi". `db.restaurantMember.upsert` (restaurantId_userId unique constraint) — idempotent. Response: `{ member }`.
+
+- **src/app/api/restaurants/[id]/members/[memberId]/route.ts** (YENİ DOSYA) oluşturuldu:
+  - PATCH: `getRoleForRestaurant` → owner değilse 403. Member bulunur, restaurantId eşleşmeli (yoksa 404). Schema: `{role: enum(manager,staff)}`. Update. Owner rolü değiştirilemez (owner RestaurantMember tablosunda değil, naturally enforced). Response: `{ member }`.
+  - DELETE: `getRoleForRestaurant` → owner değilse 403. Member bulunur, restaurantId eşleşmeli (yoksa 404). Delete. Response: `{ ok: true }`.
+
+- **Lint + Type check**:
+  - `bun run lint` → 0 error, 2 warning (pre-existing React Hook Form watch() uyarıları, auth-flow-1'den beri var, zararsız).
+  - `bunx tsc --noEmit` → src/ altında 0 hata (dokunulan dosyalarda). Kalan hatalar: `examples/websocket/*` (proje dışı), `skills/*` (proje dışı), `auth/forgot-password` (pre-existing), `seed/route` (pre-existing — db-api-routes-1 worklog'unda da kayıtlı).
+
+- **Grep doğrulama**: `coverImage\b`, `logoImage\b`, `partySize`, `.image\b` pattern'leri için src/ tarandı — 0 eşleşme (eski alan adı kalmadı). `.name`, `.time` referanslarının kalan örnekleri ya restaurant.name (değişmedi) ya da landing-page.tsx'teki local mock objeler (API'den bağımsız).
+
+Stage Summary:
+- ✅ Tüm frontend tipleri yeni şema ile uyumlu: Restaurant (coverImageUrl, logoUrl, userRole), Category (isActive), MenuItem (imageUrl), Table (tableNumber, TableStatus inactive), Reservation (guestCount, reservationDate, reservationTime), RestaurantMember (yeni tip).
+- ✅ api.ts'e 4 yeni members metodu eklendi (listMembers, addMember, updateMember, removeMember) — `/api/restaurants/${id}/members` endpoint'lerini çağırıyor.
+- ✅ constants.ts TABLE_STATUS'a `inactive` (Pasif, gray) eklendi — TableDialog dropdown'u otomatik gösteriyor.
+- ✅ 7 dashboard view'ı güncellendi (overview, menu, tables, reservations, settings, calendar, analytics) — tüm eski alan referansları yenileriyle değiştirildi.
+- ✅ public-restaurant-page.tsx güncellendi — coverImageUrl, logoUrl, imageUrl, rezervasyon formu guestCount/reservationDate/reservationTime.
+- ✅ dashboard-shell.tsx'e "Ekip" nav item'ı (Users ikonlu) ve TeamView render conditional'ı eklendi.
+- ✅ Yeni team-view.tsx: üye listesi (owner + members), rol yönetimi (manager↔staff dropdown), üye ekleme dialog'u (email + role), kaldırma onayı, "Bu sayfayı görüntüleme yetkiniz yok" banner'ı (non-owner), "Sen" badge'i, role-aware UI.
+- ✅ Yeni backend API: `GET/POST /api/restaurants/[id]/members` + `PATCH/DELETE /api/restaurants/[id]/members/[memberId]`. RLS-equivalent access kontrolü (requireAccessibleRestaurant GET'te, getRoleForRestaurant POST/PATCH/DELETE'te owner-only). Owner sentetik üye olarak listeye eklenir. Email ile user lookup + upert.
+- ✅ Lint temiz (0 error, 2 pre-existing warning).
+- ✅ TypeScript: dokunulan tüm dosyalarda 0 hata. Kalan hatalar sadece pre-existing/out-of-scope (forgot-password, seed route, examples/skills dış projeler).
+
+Unresolved issues / risks:
+- **Landing page mock verileri**: landing-page.tsx'teki `mockReservations`, `PreviewTables`, `PreviewMenu` local mock objeleri eski alan adlarını (`r.time`, `t.name`, `it.name`) kullanıyor — bunlar API'den bağımsız yerel mock'lar olduğu için değiştirilmedi. Eğer ileride gerçek API verisine bağlanırlarsa rename gerekir.
+- **Owner rolü değiştirme**: Backend'de owner RestaurantMember tablosunda değil, restaurant.ownerId'de. Bu nedenle PATCH endpoint'inde owner rolü değiştirilemiyor (naturally enforced). Frontend'de de owner satırı için Select/Trash gizli. İyi.
+- **Member email lookup case-sensitive**: POST endpoint'te email lowercase ile `findUnique` yapılıyor — User tablosundaki email unique constraint'i büyük/küçük harf duyarlı olabilir (SQLite'da varsayılan). Kullanıcı kayıt sırasında girdiği email tam olarak kullanılıyor. Prisma+SQLite'ta `@unique` case-sensitive olabilir; production Supabase'te CITEXT kullanılması önerilir. Şimdilik "kayıt sırasında girilen email ile eşleşmeli" kabul ediliyor.
+- **Owner'a member ekleme**: POST endpoint'te "Bu kullanıcı zaten restoranın sahibi" kontrolü var. İyi.
+- **Email doğrulama yok**: addMember ile eklenen kullanıcıya davet e-postası gönderilmiyor (e-posta sağlayıcısı yok). Kullanıcı önceden kayıt olmuşsa anında erişim kazanııyor. auth-flow-1 task'ında da belirtildiği gibi e-posta entegrasyonu ileride eklenmeli.
+- **Çoklu restoran sahipliği transferi**: Şu an restoran sahibini değiştirmek için bir mekanizma yok (ownerId hiçbir endpoint'te değiştirilemiyor). İleride ownership transfer özelliği eklenebilir.
+
+---
+Task ID: database-rls-1
+Agent: main + 2 subagents (db-api-routes-1, db-frontend-1)
+Task: Database şemasını Supabase spec'e uyumlulaştır + RLS-equivalent tenant isolation + restaurant_members + Team yönetimi
+
+Work Log:
+- Mevcut Prisma şeması okundu, spec ile karşılaştırıldı
+- **Prisma şeması yeniden yazıldı** (spec field name'leri):
+  - Restaurant: `coverImage`→`coverImageUrl`, `logoImage`→`logoUrl`
+  - Category: `isActive` alanı eklendi (spec: is_active)
+  - MenuItem: `image`→`imageUrl`
+  - Table: `name`→`tableNumber`, status'e `inactive` eklendi (spec: available|occupied|reserved|inactive + cleaning extra)
+  - Reservation: `partySize`→`guestCount`, `date`→`reservationDate`, `time`→`reservationTime`
+  - **RestaurantMember modeli eklendi**: id, restaurantId, userId, role (owner|manager|staff), createdAt + @@unique([restaurantId, userId])
+  - User modeline `memberships RestaurantMember[]` relation eklendi
+- `db push --force-reset` ile DB sıfırlandı (data loss acceptable — seed var)
+- **RLS-equivalent helper'lar auth.ts'e eklendi**:
+  - `getAccessibleRestaurantIds(userId)` — owned + member restaurant ID'leri (Supabase RLS policy equivalent: `owner_id = auth.uid() OR id IN (SELECT restaurant_id FROM restaurant_members WHERE user_id = auth.uid())`)
+  - `getAccessibleRestaurants(userId)` — restaurant list + userRole
+  - `requireAccessibleRestaurant(userId, restaurantId)` — erişim kontrolü, 404 ile existence leak önlenir
+  - `getRoleForRestaurant(userId, restaurantId)` — "owner"|"manager"|"staff"|null
+- **Subagent 1 (db-api-routes-1)** tüm API route'larını güncelledi:
+  - 10 dosya: restaurants, restaurants/[id], categories, categories/[id], menu-items, menu-items/[id], tables, tables/[id], reservations, reservations/[id], dashboard, analytics, public/restaurants/[slug], public/reservations
+  - `ensureOwned` → `requireAccessibleRestaurant`
+  - Mutasyonlarda role check: staff categori/menü/masa silemez (403), rezervasyon silemez (manager/owner gerek), ama rezervasyon oluşturup düzenleyebilir (iş gereği)
+  - Restaurant oluşturunca otomatik RestaurantMember(role="owner") eklenir
+  - Tüm field rename'ler uygulandı
+- **Seed script yeniden yazıldı**: new field names + demo staff member (garson@lepetitbistro.com / staff1234) + RestaurantMember oluşturma
+- **Subagent 2 (db-frontend-1)** frontend'i güncelledi:
+  - types.ts: tüm tipler rename edildi, RestaurantMember + RestaurantRole tipi eklendi, Restaurant'a userRole eklendi
+  - api.ts: listMembers/addMember/updateMember/removeMember metodları eklendi
+  - constants.ts: TABLE_STATUS.inactive eklendi (Pasif, gray)
+  - 8 dashboard view + public-restaurant-page + dashboard-shell: tüm field rename'ler uygulandı
+  - **Team view oluşturuldu** (team-view.tsx): üye listesi, rol dropdown, üye ekleme dialog, owner-only yönetim, staff read-only banner
+  - dashboard-shell'e "Ekip" nav item eklendi (Users ikonlu)
+  - **Members API oluşturuldu**: restaurants/[id]/members (GET+POST) + restaurants/[id]/members/[memberId] (PATCH+DELETE), owner-only mutasyonlar
+- Prisma client regenerate + dev server restart gerekti (stale client sorunu)
+
+Stage Summary:
+- ✅ Şema Supabase spec ile uyumlu: profiles(User), restaurants, restaurant_members, tables, menu_categories, menu_items, reservations — tüm field name'ler match
+- ✅ RLS-equivalent tenant isolation: her query `getAccessibleRestaurantIds` veya `requireAccessibleRestaurant` ile scope'lanır
+  - Owner sadece kendi restoranını görür
+  - Member (staff/manager) üye olduğu restoranı görür
+  - Başka restoranın verisine erişemez (404, existence leak yok)
+- ✅ Role-based permissions: owner (full), manager (CRUD), staff (read + reservation CRUD, diğer mutasyonlar 403)
+- ✅ Team yönetimi: owner üye ekleyebilir (email ile), rol değiştirebilir, kaldırabilir; staff read-only
+- ✅ agent-browser ile doğrulandı:
+  - Owner login → tüm sekmeler çalışıyor (Genel Bakış, Menü, Masalar, Rezervasyonlar, Takvim, Analitik, Ekip, Ayarlar)
+  - Masalar "Masa 1" gösteriyor (tableNumber), "Pasif" status var (inactive)
+  - Rezervasyonlar guestCount/reservationDate/reservationTime ile render
+  - Ekip view: owner + Ali Garson (staff) listeleniyor, rol dropdown aktif
+  - **Staff login (garson@lepetitbistro.com)** → RLS sayesinde restorana erişebiliyor ✓
+  - Staff Ekip view: "Bu sayfayı görüntüleme yetkiniz yok... salt okunur" banner ✓
+  - Public sayfa: cover image + menü + fiyatlar render
+- ✅ Lint: 0 error, 2 warning (RHF watch() — zararsız)
+- ✅ Dev log: runtime hatası yok
+
+Demo credentials:
+- Owner: demo@restoran.app / demo1234
+- Staff: garson@lepetitbistro.com / staff1234 (restaurant_members ile Le Petit Bistro'ya erişir)
+
+Unresolved issues / risks:
+- Supabase PostgreSQL yerine SQLite kullanılıyor (credentials yok). RLS application-layer'da. Supabase'e geçişte: gerçek RLS policy'leri yazılmalı (`owner_id = auth.uid() OR id IN (SELECT restaurant_id FROM restaurant_members WHERE user_id = auth.uid())`), auth.ts + db.ts değiştirilmeli, API route'lar aynı kalır.
+- Staff rolü rezervasyon silemiyor (manager/owner gerek) — bu iş kuralı, değiştirilebilir
+- Email ile üye ekleme: kullanıcı yoksa 404 (önce kayıt olmalı). Invite email gönderme ileride eklenebilir.
+
+Priority recommendations for next phase:
+1. Supabase'e gerçek geçiş (RLS policy'leri PostgreSQL'de tanımla)
+2. Üye davet e-postası (kayıt olmamış kullanıcı için invite link)
+3. Rezervasyon saat çakışma kontrolü (aynı masa aynı saat)
+4. Masa kat planı (görsel floor plan editor)
+5. Audit log (kim ne zaman hangi değişikliği yaptı)

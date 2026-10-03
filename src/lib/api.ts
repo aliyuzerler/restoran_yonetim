@@ -5,6 +5,8 @@ import type {
   MenuItem,
   Reservation,
   Restaurant,
+  RestaurantMember,
+  RestaurantRole,
   SafeUser,
   Table,
 } from "./types";
@@ -85,6 +87,37 @@ export const api = {
     request<{ ok: boolean }>(`/api/restaurants/${id}`, {
       method: "DELETE",
     }),
+
+  // ---- Members (team) ----
+  listMembers: (restaurantId: string) =>
+    request<{ members: RestaurantMember[] }>(
+      `/api/restaurants/${restaurantId}/members`
+    ),
+  addMember: (restaurantId: string, email: string, role: RestaurantRole) =>
+    request<{ member: RestaurantMember }>(
+      `/api/restaurants/${restaurantId}/members`,
+      {
+        method: "POST",
+        body: JSON.stringify({ email, role }),
+      }
+    ),
+  updateMember: (
+    restaurantId: string,
+    memberId: string,
+    role: RestaurantRole
+  ) =>
+    request<{ member: RestaurantMember }>(
+      `/api/restaurants/${restaurantId}/members/${memberId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ role }),
+      }
+    ),
+  removeMember: (restaurantId: string, memberId: string) =>
+    request<{ ok: boolean }>(
+      `/api/restaurants/${restaurantId}/members/${memberId}`,
+      { method: "DELETE" }
+    ),
 
   // ---- Categories ----
   listCategories: (restaurantId: string) =>

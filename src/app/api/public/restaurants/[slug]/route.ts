@@ -11,6 +11,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       where: { slug },
       include: {
         categories: {
+          where: { isActive: true },
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
         },
         menuItems: {
@@ -19,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           include: { category: true },
         },
         tables: {
-          orderBy: [{ name: "asc" }],
+          orderBy: [{ tableNumber: "asc" }],
         },
       },
     });

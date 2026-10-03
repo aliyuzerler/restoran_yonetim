@@ -84,7 +84,7 @@ export function CalendarView() {
   const countsByDay = useMemo(() => {
     const map: Record<string, number> = {};
     for (const r of reservations) {
-      map[r.date] = (map[r.date] ?? 0) + 1;
+      map[r.reservationDate] = (map[r.reservationDate] ?? 0) + 1;
     }
     return map;
   }, [reservations]);
@@ -93,17 +93,17 @@ export function CalendarView() {
 
   // Month stats
   const monthReservations = reservations.filter((r) => {
-    const [y, m] = r.date.split("-").map(Number);
+    const [y, m] = r.reservationDate.split("-").map(Number);
     return y === viewDate.getFullYear() && m - 1 === viewDate.getMonth();
   });
-  const monthGuests = monthReservations.reduce((s, r) => s + r.partySize, 0);
+  const monthGuests = monthReservations.reduce((s, r) => s + r.guestCount, 0);
 
   const todayIso = todayISO();
 
   const selectedDayReservations = selectedDay
     ? reservations
-        .filter((r) => r.date === selectedDay)
-        .sort((a, b) => a.time.localeCompare(b.time))
+        .filter((r) => r.reservationDate === selectedDay)
+        .sort((a, b) => a.reservationTime.localeCompare(b.reservationTime))
     : [];
 
   function intensity(count: number): string {
@@ -233,7 +233,7 @@ export function CalendarView() {
               }
               const count = countsByDay[cell.iso!] ?? 0;
               const isToday = cell.iso === todayIso;
-              const isPast = cell.iso < todayIso;
+              const isPast = cell.iso! < todayIso;
               const isWeekend = i % 7 >= 5;
               return (
                 <motion.button
@@ -274,7 +274,7 @@ export function CalendarView() {
                   {count > 0 && (
                     <div className="mt-1 space-y-0.5 hidden sm:block">
                       {reservations
-                        .filter((r) => r.date === cell.iso)
+                        .filter((r) => r.reservationDate === cell.iso)
                         .slice(0, 2)
                         .map((r) => (
                           <div
@@ -285,7 +285,7 @@ export function CalendarView() {
                                 : "bg-primary/10 text-primary"
                             }`}
                           >
-                            {r.time} {r.customerName.split(" ")[0]}
+                            {r.reservationTime} {r.customerName.split(" ")[0]}
                           </div>
                         ))}
                       {count > 2 && (
@@ -381,7 +381,7 @@ export function CalendarView() {
                       <div className="flex flex-col items-center justify-center w-14 shrink-0 py-1.5 rounded-lg bg-primary/5">
                         <Clock className="w-3 h-3 text-muted-foreground" />
                         <span className="text-xs font-semibold text-primary tabular-nums mt-0.5">
-                          {r.time}
+                          {r.reservationTime}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -395,11 +395,11 @@ export function CalendarView() {
                         </div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-1">
                           <Users className="w-3 h-3" />
-                          {r.partySize} kişi
+                          {r.guestCount} kişi
                           {r.table && (
                             <>
                               <span>·</span>
-                              <span>{r.table.name}</span>
+                              <span>Masa {r.table.tableNumber}</span>
                             </>
                           )}
                         </p>

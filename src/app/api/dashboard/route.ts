@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 
@@ -14,10 +15,7 @@ export async function GET(req: NextRequest) {
     const restaurantId = searchParams.get("restaurantId");
     if (!restaurantId) throw new ResponseError(400, "restaurantId gerekli");
 
-    const restaurant = await db.restaurant.findFirst({
-      where: { id: restaurantId, ownerId: user.id },
-    });
-    if (!restaurant) throw new ResponseError(404, "Restoran bulunamadı");
+    await requireAccessibleRestaurant(user.id, restaurantId);
 
     const [menuItems, tables, reservations, categories] = await Promise.all([
       db.menuItem.count({ where: { restaurantId } }),
@@ -27,7 +25,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const today = new Date().toISOString().slice(0, 10);
-    const todays = reservations.filter((r) => r.date === today);
+    const todays = reservations.filter((r) => r.reservationDate === today);
     const pending = reservations.filter((r) => r.status === "pending");
     const confirmed = reservations.filter((r) => r.status === "confirmed");
 
@@ -43,7 +41,7 @@ export async function GET(req: NextRequest) {
       const ds = d.toISOString().slice(0, 10);
       byDay.push({
         date: ds,
-        count: reservations.filter((r) => r.date === ds).length,
+        count: reservations.filter((r) => r.reservationDate === ds).length,
       });
     }
 
@@ -69,7 +67,7 @@ export async function GET(req: NextRequest) {
       },
       tablesByStatus,
       upcoming: todays
-        .sort((a, b) => a.time.localeCompare(b.time))
+        .sort((a, b) => a.reservationTime.localeCompare(b.reservationTime))
         .slice(0, 6),
     });
   } catch (e) {

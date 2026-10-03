@@ -115,6 +115,7 @@ export function MenuView() {
                       name: "Diğer",
                       description: null,
                       sortOrder: 999,
+                      isActive: true,
                       restaurantId: current?.id ?? "",
                     } as Category,
                     items: uncategorized,

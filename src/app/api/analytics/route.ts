@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 
@@ -14,10 +15,7 @@ export async function GET(req: NextRequest) {
     const restaurantId = searchParams.get("restaurantId");
     if (!restaurantId) throw new ResponseError(400, "restaurantId gerekli");
 
-    const restaurant = await db.restaurant.findFirst({
-      where: { id: restaurantId, ownerId: user.id },
-    });
-    if (!restaurant) throw new ResponseError(404, "Restoran bulunamadı");
+    const restaurant = await requireAccessibleRestaurant(user.id, restaurantId);
 
     const [reservations, menuItems, categories, tables] = await Promise.all([
       db.reservation.findMany({
@@ -37,7 +35,7 @@ export async function GET(req: NextRequest) {
     // 1. Busy hours: reservation count by hour bucket
     const hourBuckets: Record<string, number> = {};
     for (const r of reservations) {
-      const hour = parseInt(r.time.split(":")[0] ?? "12", 10);
+      const hour = parseInt(r.reservationTime.split(":")[0] ?? "12", 10);
       // bucket: 12-14 lunch, 18-22 dinner, else other
       let bucket = "12-14";
       if (hour >= 18 && hour < 23) bucket = "18-22";
@@ -59,15 +57,15 @@ export async function GET(req: NextRequest) {
       menuItems.length > 0
         ? menuItems.reduce((s, m) => s + m.price, 0) / menuItems.length
         : 0;
-    const totalGuests = reservations.reduce((s, r) => s + r.partySize, 0);
+    const totalGuests = reservations.reduce((s, r) => s + r.guestCount, 0);
     const realizedGuests = reservations
       .filter((r) =>
         ["confirmed", "seated", "completed"].includes(r.status)
       )
-      .reduce((s, r) => s + r.partySize, 0);
+      .reduce((s, r) => s + r.guestCount, 0);
     const completedGuests = reservations
       .filter((r) => r.status === "completed" || r.status === "seated")
-      .reduce((s, r) => s + r.partySize, 0);
+      .reduce((s, r) => s + r.guestCount, 0);
     const estimatedRevenue = Math.round(realizedGuests * avgPrice);
     const potentialRevenue = Math.round(totalGuests * avgPrice);
 
@@ -77,6 +75,7 @@ export async function GET(req: NextRequest) {
         id: m.id,
         name: m.name,
         price: m.price,
+        imageUrl: m.imageUrl,
         categoryName: m.category?.name ?? "Diğer",
         isFeatured: m.isFeatured,
         isAvailable: m.isAvailable,
@@ -116,11 +115,13 @@ export async function GET(req: NextRequest) {
         month: "short",
         year: "2-digit",
       });
-      const inMonth = reservations.filter((r) => r.date.startsWith(ym));
+      const inMonth = reservations.filter((r) =>
+        r.reservationDate.startsWith(ym)
+      );
       months.push({
         label,
         count: inMonth.length,
-        guests: inMonth.reduce((s, r) => s + r.partySize, 0),
+        guests: inMonth.reduce((s, r) => s + r.guestCount, 0),
       });
     }
 

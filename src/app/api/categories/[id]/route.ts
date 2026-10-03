@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  getRoleForRestaurant,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 
@@ -13,6 +15,7 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   sortOrder: z.number().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -25,8 +28,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!cat || cat.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Kategori bulunamadı");
+    if (!cat) throw new ResponseError(404, "Kategori bulunamadı");
+
+    // RLS-equivalent: ensure user can access this restaurant.
+    await requireAccessibleRestaurant(user.id, cat.restaurantId);
+
+    // Only owner or manager can modify.
+    const role = await getRoleForRestaurant(user.id, cat.restaurantId);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
     }
 
     const body = await req.json();
@@ -55,8 +65,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!cat || cat.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Kategori bulunamadı");
+    if (!cat) throw new ResponseError(404, "Kategori bulunamadı");
+
+    await requireAccessibleRestaurant(user.id, cat.restaurantId);
+
+    const role = await getRoleForRestaurant(user.id, cat.restaurantId);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
     }
 
     await db.category.delete({ where: { id } });

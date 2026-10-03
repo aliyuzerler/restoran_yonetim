@@ -102,17 +102,17 @@ export function ReservationsView() {
   const today = todayISO();
   const filtered = reservations.filter((r) => {
     if (filter === "all") return true;
-    if (filter === "today") return r.date === today;
+    if (filter === "today") return r.reservationDate === today;
     if (filter === "pending") return r.status === "pending";
     if (filter === "confirmed") return r.status === "confirmed";
-    if (filter === "upcoming") return r.date >= today && r.status !== "cancelled" && r.status !== "completed";
+    if (filter === "upcoming") return r.reservationDate >= today && r.status !== "cancelled" && r.status !== "completed";
     return true;
   });
 
   // Sort: upcoming first by date+time
   filtered.sort((a, b) => {
-    const da = a.date + a.time;
-    const db = b.date + b.time;
+    const da = a.reservationDate + a.reservationTime;
+    const db = b.reservationDate + b.reservationTime;
     return da < db ? -1 : da > db ? 1 : 0;
   });
 
@@ -128,9 +128,9 @@ export function ReservationsView() {
   // Group by date
   const groups: { date: string; items: Reservation[] }[] = [];
   for (const r of filtered) {
-    let g = groups.find((x) => x.date === r.date);
+    let g = groups.find((x) => x.date === r.reservationDate);
     if (!g) {
-      g = { date: r.date, items: [] };
+      g = { date: r.reservationDate, items: [] };
       groups.push(g);
     }
     g.items.push(r);
@@ -170,14 +170,14 @@ export function ReservationsView() {
               {f.key === "all"
                 ? reservations.length
                 : f.key === "today"
-                ? reservations.filter((r) => r.date === today).length
+                ? reservations.filter((r) => r.reservationDate === today).length
                 : f.key === "pending"
                 ? reservations.filter((r) => r.status === "pending").length
                 : f.key === "confirmed"
                 ? reservations.filter((r) => r.status === "confirmed").length
                 : reservations.filter(
                     (r) =>
-                      r.date >= today &&
+                      r.reservationDate >= today &&
                       r.status !== "cancelled" &&
                       r.status !== "completed"
                   ).length}
@@ -268,7 +268,7 @@ export function ReservationsView() {
             <AlertDialogTitle>Rezervasyonu sil</AlertDialogTitle>
             <AlertDialogDescription>
               <strong>{deleteId?.customerName}</strong> adlı müşterinin{" "}
-              {deleteId?.date} {deleteId?.time} rezervasyonunu silmek istediğine
+              {deleteId?.reservationDate} {deleteId?.reservationTime} rezervasyonunu silmek istediğine
               emin misin?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -323,7 +323,7 @@ function ReservationRow({
         <CardContent className="p-4 flex items-center gap-4">
           {/* Time */}
           <div className="flex flex-col items-center justify-center w-16 shrink-0">
-            <span className="text-lg font-bold tabular-nums">{res.time}</span>
+            <span className="text-lg font-bold tabular-nums">{res.reservationTime}</span>
             <Clock className="w-3 h-3 text-muted-foreground mt-0.5" />
           </div>
 
@@ -339,7 +339,7 @@ function ReservationRow({
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                 <span className="flex items-center gap-1">
                   <Users className="w-3 h-3" />
-                  {res.partySize} kişi
+                  {res.guestCount} kişi
                 </span>
                 {res.customerPhone && (
                   <span className="hidden sm:flex items-center gap-1">
@@ -348,7 +348,7 @@ function ReservationRow({
                   </span>
                 )}
                 {res.table && (
-                  <span className="hidden md:inline">· {res.table.name}</span>
+                  <span className="hidden md:inline">· Masa {res.table.tableNumber}</span>
                 )}
                 {res.source === "online" && (
                   <Badge variant="outline" className="text-[10px] py-0 px-1.5">
@@ -443,9 +443,9 @@ function ReservationDialog({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
-  const [partySize, setPartySize] = useState("2");
-  const [date, setDate] = useState(todayISO());
-  const [time, setTime] = useState("19:00");
+  const [guestCount, setGuestCount] = useState("2");
+  const [reservationDate, setReservationDate] = useState(todayISO());
+  const [reservationTime, setReservationTime] = useState("19:00");
   const [tableId, setTableId] = useState("");
   const [status, setStatus] = useState<ReservationStatus>("pending");
   const [notes, setNotes] = useState("");
@@ -456,9 +456,9 @@ function ReservationDialog({
       setCustomerName(res?.customerName ?? "");
       setCustomerPhone(res?.customerPhone ?? "");
       setCustomerEmail(res?.customerEmail ?? "");
-      setPartySize(res ? String(res.partySize) : "2");
-      setDate(res?.date ?? todayISO());
-      setTime(res?.time ?? "19:00");
+      setGuestCount(res ? String(res.guestCount) : "2");
+      setReservationDate(res?.reservationDate ?? todayISO());
+      setReservationTime(res?.reservationTime ?? "19:00");
       setTableId(res?.tableId ?? "");
       setStatus(res?.status ?? "pending");
       setNotes(res?.notes ?? "");
@@ -472,9 +472,9 @@ function ReservationDialog({
         customerName,
         customerPhone: customerPhone || null,
         customerEmail: customerEmail || null,
-        partySize: Number(partySize) || 1,
-        date,
-        time,
+        guestCount: Number(guestCount) || 1,
+        reservationDate,
+        reservationTime,
         tableId: tableId || null,
         status,
         notes: notes || null,
@@ -515,8 +515,8 @@ function ReservationDialog({
               <Input
                 type="number"
                 min={1}
-                value={partySize}
-                onChange={(e) => setPartySize(e.target.value)}
+                value={guestCount}
+                onChange={(e) => setGuestCount(e.target.value)}
               />
             </div>
           </div>
@@ -544,13 +544,13 @@ function ReservationDialog({
               <Label>Tarih</Label>
               <Input
                 type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                value={reservationDate}
+                onChange={(e) => setReservationDate(e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label>Saat</Label>
-              <Select value={time} onValueChange={setTime}>
+              <Select value={reservationTime} onValueChange={setReservationTime}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -574,7 +574,7 @@ function ReservationDialog({
                 <SelectContent>
                   {tables.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name} ({t.capacity} kiilik)
+                      Masa {t.tableNumber} ({t.capacity} kişilik)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -615,7 +615,7 @@ function ReservationDialog({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={!customerName || !date || !time || mutation.isPending}
+            disabled={!customerName || !reservationDate || !reservationTime || mutation.isPending}
           >
             {mutation.isPending ? "Kaydediliyor..." : "Kaydet"}
           </Button>

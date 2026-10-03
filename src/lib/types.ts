@@ -5,6 +5,8 @@ export type SafeUser = {
   role: string;
 };
 
+export type RestaurantRole = "owner" | "manager" | "staff";
+
 export type Restaurant = {
   id: string;
   slug: string;
@@ -15,8 +17,8 @@ export type Restaurant = {
   email: string | null;
   address: string | null;
   city: string | null;
-  coverImage: string | null;
-  logoImage: string | null;
+  coverImageUrl: string | null;
+  logoUrl: string | null;
   openTime: string | null;
   closeTime: string | null;
   currency: string;
@@ -24,10 +26,24 @@ export type Restaurant = {
   ownerId: string;
   createdAt: string;
   updatedAt: string;
+  userRole?: RestaurantRole;
   _count?: {
     menuItems: number;
     tables: number;
     reservations: number;
+  };
+};
+
+export type RestaurantMember = {
+  id: string;
+  restaurantId: string;
+  userId: string;
+  role: RestaurantRole;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
   };
 };
 
@@ -36,6 +52,7 @@ export type Category = {
   name: string;
   description: string | null;
   sortOrder: number;
+  isActive: boolean;
   restaurantId: string;
   _count?: { menuItems: number };
 };
@@ -45,7 +62,7 @@ export type MenuItem = {
   name: string;
   description: string | null;
   price: number;
-  image: string | null;
+  imageUrl: string | null;
   isAvailable: boolean;
   isFeatured: boolean;
   tags: string | null;
@@ -59,11 +76,12 @@ export type TableStatus =
   | "available"
   | "occupied"
   | "reserved"
+  | "inactive"
   | "cleaning";
 
 export type Table = {
   id: string;
-  name: string;
+  tableNumber: string;
   capacity: number;
   location: string | null;
   status: TableStatus;
@@ -84,9 +102,9 @@ export type Reservation = {
   customerName: string;
   customerPhone: string | null;
   customerEmail: string | null;
-  partySize: number;
-  date: string;
-  time: string;
+  guestCount: number;
+  reservationDate: string;
+  reservationTime: string;
   status: ReservationStatus;
   notes: string | null;
   source: string;

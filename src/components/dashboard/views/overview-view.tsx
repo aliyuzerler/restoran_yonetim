@@ -293,7 +293,7 @@ export function OverviewView() {
                     >
                       <div className="flex flex-col items-center justify-center w-14 shrink-0 py-1 rounded-lg bg-primary/5">
                         <span className="text-xs font-semibold text-primary tabular-nums">
-                          {r.time}
+                          {r.reservationTime}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -302,11 +302,11 @@ export function OverviewView() {
                         </p>
                         <p className="text-xs text-muted-foreground flex items-center gap-2">
                           <Users className="w-3 h-3" />
-                          {r.partySize} kişi
+                          {r.guestCount} kişi
                           {r.table && (
                             <>
                               <span>·</span>
-                              <span>{r.table.name}</span>
+                              <span>Masa {r.table.tableNumber}</span>
                             </>
                           )}
                         </p>

@@ -69,6 +69,11 @@ export const TABLE_STATUS: Record<
     color: "#6b7280",
     dot: "bg-gray-500",
   },
+  inactive: {
+    label: "Pasif",
+    color: "#9ca3af",
+    dot: "bg-gray-400",
+  },
 };
 
 export const TIME_SLOTS: string[] = [

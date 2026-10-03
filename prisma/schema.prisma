@@ -1,4 +1,7 @@
-// Prisma schema for Restaurant Management SaaS
+// Prisma schema for Restaurant Management SaaS ("Tablo")
+// Mirrors the Supabase PostgreSQL spec. Field names use camelCase in Prisma
+// which maps to snake_case columns in PostgreSQL. Data isolation (RLS
+// equivalent) is enforced at the API layer via getAccessibleRestaurantIds().
 // learn more: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -10,19 +13,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Auth + profile
+// ---------------------------------------------------------------------------
+
+// Combines Supabase auth.users + profiles table:
+// id, email, full_name (name), role, created_at
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  name         String
+  name         String // full_name
   passwordHash String
-  role         String   @default("owner") // owner | staff
+  role         String   @default("owner") // owner | manager | staff (global default role)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sessions       Session[]
-  restaurants    Restaurant[]
-  reservations   Reservation[]
-  passwordResets PasswordReset[]
+  sessions        Session[]
+  restaurants     Restaurant[] @relation("OwnedRestaurants")
+  memberships     RestaurantMember[]
+  reservations    Reservation[]
+  passwordResets  PasswordReset[]
 }
 
 model Session {
@@ -39,7 +49,7 @@ model Session {
 model PasswordReset {
   id        String   @id @default(cuid())
   token     String   @unique
-  email     String   // the user email this reset is for
+  email     String
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   expiresAt DateTime
@@ -50,41 +60,73 @@ model PasswordReset {
   @@index([token])
 }
 
+// ---------------------------------------------------------------------------
+// Restaurants + members (multi-tenant)
+// ---------------------------------------------------------------------------
+
+// restaurants: id, owner_id, name, slug, description, phone, email, address,
+// logo_url, cover_image_url, cuisine, city, open_time, close_time, currency,
+// is_active, created_at, updated_at
 model Restaurant {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  name        String
-  description String?
-  cuisine     String?
-  phone       String?
-  email       String?
-  address     String?
-  city        String?
-  coverImage  String?
-  logoImage   String?
-  openTime    String?  // "09:00"
-  closeTime   String?  // "23:00"
-  currency    String   @default("₺")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String?
+  cuisine       String?
+  phone         String?
+  email         String?
+  address       String?
+  city          String?
+  logoUrl       String? // logo_url
+  coverImageUrl String? // cover_image_url
+  openTime      String?
+  closeTime     String?
+  currency      String   @default("₺")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId       String
+  owner         User     @relation("OwnedRestaurants", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  categories  Category[]
-  menuItems   MenuItem[]
-  tables      Table[]
-  reservations Reservation[]
+  members       RestaurantMember[]
+  categories    Category[]
+  menuItems     MenuItem[]
+  tables        Table[]
+  reservations  Reservation[]
 
   @@index([ownerId])
 }
 
+// restaurant_members: id, restaurant_id, user_id, role, created_at
+// role: owner | manager | staff
+// A user can access a restaurant if they own it OR have a membership row.
+model RestaurantMember {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String   @default("staff") // owner | manager | staff
+  createdAt    DateTime @default(now())
+
+  @@unique([restaurantId, userId])
+  @@index([restaurantId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Menu
+// ---------------------------------------------------------------------------
+
+// menu_categories: id, restaurant_id, name, description, sort_order,
+// is_active, created_at
 model Category {
   id           String   @id @default(cuid())
   name         String
   description  String?
   sortOrder    Int      @default(0)
+  isActive     Boolean  @default(true)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
@@ -95,15 +137,17 @@ model Category {
   @@index([restaurantId])
 }
 
+// menu_items: id, restaurant_id, category_id, name, description, price,
+// image_url, is_available, is_featured, tags, sort_order, created_at, updated_at
 model MenuItem {
   id           String   @id @default(cuid())
   name         String
   description  String?
   price        Float
-  image        String?
+  imageUrl     String? // image_url
   isAvailable  Boolean  @default(true)
   isFeatured   Boolean  @default(false)
-  tags         String?  // comma separated: "vegan,spicy"
+  tags         String?
   sortOrder    Int      @default(0)
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -116,12 +160,19 @@ model MenuItem {
   @@index([categoryId])
 }
 
+// ---------------------------------------------------------------------------
+// Tables
+// ---------------------------------------------------------------------------
+
+// tables: id, restaurant_id, table_number, capacity, status, location, notes,
+// created_at, updated_at
+// status: available | occupied | reserved | inactive (spec) + cleaning (extra)
 model Table {
   id           String   @id @default(cuid())
-  name         String   // "Masa 1", "Pencere Kenarı 2"
+  tableNumber  String   // "1", "2" — display label like "Masa 1" derived client-side
   capacity     Int      @default(4)
-  location     String?  // "İç Salon", "Teras", "Bahçe"
-  status       String   @default("available") // available | occupied | reserved | cleaning
+  location     String?
+  status       String   @default("available") // available | occupied | reserved | inactive | cleaning
   notes        String?
   restaurantId String
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -133,29 +184,37 @@ model Table {
   @@index([restaurantId])
 }
 
+// ---------------------------------------------------------------------------
+// Reservations
+// ---------------------------------------------------------------------------
+
+// reservations: id, restaurant_id, customer_name, customer_phone,
+// customer_email, reservation_date, reservation_time, guest_count, table_id,
+// status, notes, source, created_at, updated_at
+// status: pending | confirmed | cancelled | completed (spec) + seated | no_show (extra)
 model Reservation {
-  id           String   @id @default(cuid())
-  customerName String
-  customerPhone String?
-  customerEmail String?
-  partySize    Int      @default(2)
-  date         String   // "2025-01-15"
-  time         String   // "19:30"
-  status       String   @default("pending") // pending | confirmed | seated | completed | cancelled | no_show
-  notes        String?
-  source       String   @default("manual") // manual | online
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  tableId      String?
-  table        Table?    @relation(fields: [tableId], references: [id], onDelete: SetNull)
-  userId       String?  // staff who created/owns it
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  customerName    String
+  customerPhone   String?
+  customerEmail   String?
+  guestCount      Int      @default(2) // guest_count (was partySize)
+  reservationDate String   // "2025-01-15" (was date)
+  reservationTime String   // "19:30" (was time)
+  status          String   @default("pending") // pending | confirmed | cancelled | completed | seated | no_show
+  notes           String?
+  source          String   @default("manual") // manual | online
+  restaurantId    String
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId         String?
+  table           Table?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  userId          String? // staff who created/owns it
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([restaurantId])
   @@index([tableId])
   @@index([userId])
   @@index([status])
-  @@index([date])
+  @@index([reservationDate])
 }

@@ -19,6 +19,7 @@ import {
   ChevronDown,
   CalendarDays,
   BarChart3,
+  Users,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useNavigate, useRoute, type Route } from "@/lib/router";
@@ -56,6 +57,7 @@ import { ReservationsView } from "./views/reservations-view";
 import { SettingsView } from "./views/settings-view";
 import { CalendarView } from "./views/calendar-view";
 import { AnalyticsView } from "./views/analytics-view";
+import { TeamView } from "./views/team-view";
 
 const NAV = [
   { tab: "overview", label: "Genel Bakış", icon: LayoutDashboard },
@@ -64,6 +66,7 @@ const NAV = [
   { tab: "reservations", label: "Rezervasyonlar", icon: CalendarCheck },
   { tab: "calendar", label: "Takvim", icon: CalendarDays },
   { tab: "analytics", label: "Analitik", icon: BarChart3 },
+  { tab: "team", label: "Ekip", icon: Users },
   { tab: "settings", label: "Ayarlar", icon: Settings },
 ] as const;
 
@@ -310,6 +313,7 @@ export function DashboardShell() {
               {activeTab === "reservations" && <ReservationsView />}
               {activeTab === "calendar" && <CalendarView />}
               {activeTab === "analytics" && <AnalyticsView />}
+              {activeTab === "team" && <TeamView />}
               {activeTab === "settings" && <SettingsView />}
             </motion.div>
           </AnimatePresence>

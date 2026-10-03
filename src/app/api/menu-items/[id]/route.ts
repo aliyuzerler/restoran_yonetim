@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  getRoleForRestaurant,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 
@@ -14,7 +16,7 @@ const updateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   price: z.number().min(0).optional(),
-  image: z.string().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
   isAvailable: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
   tags: z.string().optional().nullable(),
@@ -31,8 +33,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!item || item.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Ürün bulunamadı");
+    if (!item) throw new ResponseError(404, "Ürün bulunamadı");
+
+    await requireAccessibleRestaurant(user.id, item.restaurantId);
+
+    const role = await getRoleForRestaurant(user.id, item.restaurantId);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
     }
 
     const body = await req.json();
@@ -41,10 +48,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       throw new ResponseError(400, parsed.error.issues[0].message);
     }
 
-    const { categoryId, image, tags, ...rest } = parsed.data;
+    const { categoryId, imageUrl, tags, ...rest } = parsed.data;
     const data: Record<string, unknown> = { ...rest };
     if (categoryId !== undefined) data.categoryId = categoryId || null;
-    if (image !== undefined) data.image = image || null;
+    if (imageUrl !== undefined) data.imageUrl = imageUrl || null;
     if (tags !== undefined) data.tags = tags || null;
 
     const updated = await db.menuItem.update({ where: { id }, data });
@@ -64,8 +71,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       where: { id },
       include: { restaurant: true },
     });
-    if (!item || item.restaurant.ownerId !== user.id) {
-      throw new ResponseError(404, "Ürün bulunamadı");
+    if (!item) throw new ResponseError(404, "Ürün bulunamadı");
+
+    await requireAccessibleRestaurant(user.id, item.restaurantId);
+
+    const role = await getRoleForRestaurant(user.id, item.restaurantId);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
     }
 
     await db.menuItem.delete({ where: { id } });

@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import {
   errorResponse,
   getCurrentUser,
+  getRoleForRestaurant,
+  requireAccessibleRestaurant,
   ResponseError,
 } from "@/lib/auth";
 import { uniqueSlug } from "@/lib/slug";
@@ -18,8 +20,8 @@ const updateSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   address: z.string().optional(),
   city: z.string().optional(),
-  coverImage: z.string().optional(),
-  logoImage: z.string().optional(),
+  coverImageUrl: z.string().optional(),
+  logoUrl: z.string().optional(),
   openTime: z.string().optional(),
   closeTime: z.string().optional(),
   currency: z.string().optional(),
@@ -31,10 +33,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const user = await getCurrentUser();
     if (!user) throw new ResponseError(401, "Yetkisiz erişim");
     const { id } = await params;
-    const restaurant = await db.restaurant.findFirst({
-      where: { id, ownerId: user.id },
-    });
-    if (!restaurant) throw new ResponseError(404, "Restoran bulunamadı");
+    const restaurant = await requireAccessibleRestaurant(user.id, id);
     return Response.json({ restaurant });
   } catch (e) {
     return errorResponse(e);
@@ -47,10 +46,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!user) throw new ResponseError(401, "Yetkisiz erişim");
     const { id } = await params;
 
-    const existing = await db.restaurant.findFirst({
-      where: { id, ownerId: user.id },
-    });
-    if (!existing) throw new ResponseError(404, "Restoran bulunamadı");
+    const existing = await requireAccessibleRestaurant(user.id, id);
+
+    // Only owner or manager can modify restaurant settings.
+    const role = await getRoleForRestaurant(user.id, id);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
+    }
 
     const body = await req.json();
     const parsed = updateSchema.safeParse(body);
@@ -58,7 +60,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       throw new ResponseError(400, parsed.error.issues[0].message);
     }
 
-    let data: Record<string, unknown> = { ...parsed.data };
+    const data: Record<string, unknown> = { ...parsed.data };
     if (parsed.data.email !== undefined) {
       data.email = parsed.data.email || null;
     }
@@ -82,10 +84,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     if (!user) throw new ResponseError(401, "Yetkisiz erişim");
     const { id } = await params;
 
-    const existing = await db.restaurant.findFirst({
-      where: { id, ownerId: user.id },
-    });
-    if (!existing) throw new ResponseError(404, "Restoran bulunamadı");
+    await requireAccessibleRestaurant(user.id, id);
+
+    // Only owner or manager can delete.
+    const role = await getRoleForRestaurant(user.id, id);
+    if (role !== "owner" && role !== "manager") {
+      throw new ResponseError(403, "Bu işlem için yetkiniz yok");
+    }
 
     await db.restaurant.delete({ where: { id } });
     return Response.json({ ok: true });

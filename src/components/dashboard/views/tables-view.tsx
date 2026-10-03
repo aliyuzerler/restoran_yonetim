@@ -193,7 +193,7 @@ export function TablesView() {
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                               <div>
-                                <h3 className="font-semibold">{t.name}</h3>
+                                <h3 className="font-semibold">Masa {t.tableNumber}</h3>
                                 <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                                   <Users className="w-3 h-3" />
                                   {t.capacity} kişilik
@@ -289,7 +289,7 @@ export function TablesView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Masayı sil</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{deleteId?.name}</strong> masasını silmek istediğine emin
+              <strong>Masa {deleteId?.tableNumber}</strong> masasını silmek istediğine emin
               misin?
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -333,7 +333,7 @@ function TableDialog({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [name, setName] = useState("");
+  const [tableNumber, setTableNumber] = useState("");
   const [capacity, setCapacity] = useState("4");
   const [location, setLocation] = useState("");
   const [status, setStatus] = useState<TableStatus>("available");
@@ -342,7 +342,7 @@ function TableDialog({
   if (open !== lastOpen) {
     setLastOpen(open);
     if (open) {
-      setName(table?.name ?? "");
+      setTableNumber(table?.tableNumber ?? "");
       setCapacity(table ? String(table.capacity) : "4");
       setLocation(table?.location ?? "");
       setStatus(table?.status ?? "available");
@@ -354,7 +354,7 @@ function TableDialog({
     mutationFn: async () => {
       const payload = {
         restaurantId,
-        name,
+        tableNumber,
         capacity: Number(capacity) || 1,
         location: location || null,
         status,
@@ -382,11 +382,11 @@ function TableDialog({
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Masa Adı</Label>
+              <Label>Masa Numarası</Label>
               <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Masa 1"
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                placeholder="1"
               />
             </div>
             <div className="space-y-2">
@@ -441,7 +441,7 @@ function TableDialog({
           </Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={!name || mutation.isPending}
+            disabled={!tableNumber || mutation.isPending}
           >
             {mutation.isPending ? "Kaydediliyor..." : "Kaydet"}
           </Button>
