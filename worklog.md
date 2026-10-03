@@ -1020,3 +1020,65 @@ Priority recommendations for next phase:
 2. Create pages/ folder structure when doing a major refactor
 3. Set up Supabase project + migrate (services layer ready)
 4. Add ErrorBoundary component for route-level error catching
+
+---
+Task ID: github-pages-seo-1
+Agent: main
+Task: GitHub Pages deployment + SEO metadata (title, description, OG, favicons, public page SEO)
+
+Work Log:
+- **GitHub Actions workflow** (`.github/workflows/deploy.yml`):
+  - Triggers: push to main + workflow_dispatch
+  - Steps: checkout → setup bun → install → prisma generate → build:static → upload artifact → deploy
+  - concurrency group: pages (cancel-in-progress)
+  - permissions: pages write + id-token write
+  - Deploy job: actions/deploy-pages@v4, outputs page_url
+- **package.json**: `build:static` script added (`NEXT_PUBLIC_STATIC_EXPORT=true next build`)
+- **next.config.ts**: conditional `output: "export"` when STATIC_EXPORT=true, `trailingSlash`, `images.unoptimized`, basePath support
+- **SPA routing for GitHub Pages** (`public/404.html`):
+  - JavaScript redirect: converts path to hash route, preserves original path+search
+  - meta refresh fallback
+  - Handles deep-link refreshes (e.g., /r/slug → /#/r/slug)
+- **SEO metadata** (layout.tsx):
+  - `metadataBase`, `title` (default + template "%s · Tablo")
+  - `description`, `keywords` (9 keywords)
+  - `openGraph`: type, locale (tr_TR), url, siteName, title, description, images (1200x630)
+  - `twitter`: summary_large_image card
+  - `icons`: favicon.svg + apple-touch
+  - `manifest`: /manifest.json
+  - `robots`: index/follow + googleBot config
+  - `viewport`: themeColor (light/dark), width, initialScale
+  - JSON-LD structured data: SoftwareApplication schema with aggregateRating
+- **Favicon** (`public/favicon.svg`): custom Tablo "T" mark SVG (32x32, terracotta bg)
+- **OG image** (`public/og-image.svg`): 1200x630 social preview with logo, headline, CTA
+- **manifest.json**: name, short_name, description, start_url, theme_color, icons
+- **robots.txt**: allow all + sitemap reference
+- **sitemap.xml**: landing, login, register, public restaurant page (le-petit-bistro)
+- **Public restaurant page SEO** (dynamic, client-side):
+  - useEffect updates document.title to "{restaurant.name} · Menü & Rezervasyon"
+  - Sets meta: description, og:title, og:description, og:type (restaurant.menu), og:image (cover/logo), og:url, twitter:title/description/image
+  - JSON-LD Restaurant schema: name, description, servesCuisine, telephone, email, address, url, image, acceptsReservations
+  - Cleanup on unmount (removes JSON-LD script)
+
+Stage Summary:
+- ✅ GitHub Actions workflow for auto-deploy to GitHub Pages (build:static → upload → deploy)
+- ✅ SPA routing solved: 404.html redirects to index with hash (GitHub Pages compatible)
+- ✅ next.config.ts: conditional static export, trailingSlash, unoptimized images
+- ✅ Landing page SEO: title, description, OG, Twitter card, favicons, manifest, JSON-LD, robots
+- ✅ Public restaurant page SEO: dynamic title/meta/JSON-LD per restaurant (verified Le Petit Bistro)
+- ✅ favicon.svg, og-image.svg, manifest.json, robots.txt, sitemap.xml
+- ✅ agent-browser verification:
+  - Landing: title "Tablo — Restoran Yönetim Platformu", og:title, og:description, twitter:card, manifest, favicon, theme-color, JSON-LD
+  - Public page: title "Le Petit Bistro · Menü & Rezervasyon", og:type "restaurant.menu", og:image (cover), JSON-LD Restaurant schema
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+
+Unresolved issues / risks:
+- Static export requires a separate DB-less mode (API routes don't work on GitHub Pages). The app needs a backend (Supabase or self-hosted) for API. GitHub Pages only hosts the frontend.
+- NEXT_PUBLIC_SITE_URL defaults to tablo.app — set actual domain in env
+- og-image is SVG (some platforms prefer PNG/JPG) — acceptable for MVP
+
+Priority recommendations for next phase:
+1. Generate PNG OG image (1200x630) for better social platform compatibility
+2. Add more public restaurant pages to sitemap (dynamic generation)
+3. Set up NEXT_PUBLIC_SITE_URL + NEXT_PUBLIC_BASE_PATH in GitHub repo settings
+4. Add canonical URL tags for each route

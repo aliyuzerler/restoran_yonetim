@@ -1,14 +1,9 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# robots.txt — allow all crawlers
 User-agent: *
 Allow: /
+
+# Public restaurant pages are crawlable for SEO
+# Admin dashboard routes are hash-based (#/admin) so not indexed as separate URLs
+
+# Sitemap
+Sitemap: https://tablo.app/sitemap.xml

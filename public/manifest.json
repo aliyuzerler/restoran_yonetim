@@ -1,0 +1,17 @@
+{
+  "name": "Tablo — Restoran Yönetim Platformu",
+  "short_name": "Tablo",
+  "description": "Restoranınızın menüsünü, masalarını, rezervasyonlarını ve profilini tek bir modern panelden yönetin.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafaf9",
+  "theme_color": "#c2682c",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

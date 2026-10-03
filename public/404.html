@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tablo — Restoran Yönetim Platformu</title>
+    <!--
+      GitHub Pages SPA fallback: redirect any 404 to index.html so the
+      hash-based router (/#/dashboard, /#/r/slug) can handle the route.
+      This script preserves the original path as a hash so the app can
+      recover the intended destination.
+    -->
+    <script>
+      // GitHub Pages serves this 404.html for any unknown path.
+      // Convert the path to a hash route and redirect to index.
+      var pathSegmentsToKeep = 0; // set to 1 if using a project page (user.github.io/repo)
+      var l = window.location;
+      var path = l.pathname
+        .split("/")
+        .slice(0, 1 + pathSegmentsToKeep)
+        .join("/")
+        .replace(/\/$/, "");
+      // Preserve the original path + search as hash so the SPA can route
+      var target =
+        path + "/#" + l.pathname.slice(path.length) + l.search + l.hash;
+      l.replace(target);
+    </script>
+    <meta http-equiv="refresh" content="0; url=/" />
+    <meta
+      name="description"
+      content="Restoranınızın menüsünü, masalarını, rezervasyonlarını ve profilini tek bir modern panelden yönetin."
+    />
+  </head>
+  <body>
+    <p>Yönlendiriliyor... <a href="/">Ana sayfaya git</a></p>
+  </body>
+</html>

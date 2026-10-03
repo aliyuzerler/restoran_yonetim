@@ -1,0 +1,82 @@
+# GitHub Actions workflow — auto-deploy to GitHub Pages
+#
+# This workflow builds the Next.js app and deploys the static export to
+# GitHub Pages on every push to main (and on manual dispatch).
+#
+# IMPORTANT for GitHub Pages:
+# 1. The app uses hash-based routing (/#/dashboard, /#/r/slug) so it works
+#    on GitHub Pages without server-side rewrites.
+# 2. A 404.html is included in public/ that redirects to index.html,
+#    handling deep-link refreshes.
+# 3. In the repo settings: Settings → Pages → Source = "GitHub Actions".
+#
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow only one concurrent deployment
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: bun run db:generate
+        env:
+          DATABASE_URL: file:./db/custom.db
+
+      - name: Build
+        run: bun run build:static
+        env:
+          DATABASE_URL: file:./db/custom.db
+          # Set these in GitHub repo Settings → Secrets and variables → Actions
+          # NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          # NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

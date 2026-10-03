@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+// Note: SEO metadata is updated dynamically via useSeo hook below
 import { motion } from "framer-motion";
 import {
   MapPin,
@@ -60,6 +61,73 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
     queryFn: () => api.publicRestaurant(slug),
     retry: false,
   });
+
+  // Dynamic SEO — update document title + meta tags for the public restaurant page.
+  // This makes each restaurant page shareable with proper title/description/OG tags.
+  useEffect(() => {
+    if (!data?.restaurant) return;
+    const r = data.restaurant;
+    const title = `${r.name} · Menü & Rezervasyon`;
+    const description =
+      r.description ??
+      `${r.name} — online menü ve rezervasyon. ${r.cuisine ?? ""} mutfağı`.trim();
+    const ogImageUrl = r.coverImageUrl ?? r.logoUrl ?? "/og-image.svg";
+
+    document.title = title;
+
+    const setMeta = (name: string, content: string, attr: "name" | "property" = "name") => {
+      let el = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+    };
+
+    setMeta("description", description);
+    setMeta("og:title", title, "property");
+    setMeta("og:description", description, "property");
+    setMeta("og:type", "restaurant.menu", "property");
+    setMeta("og:image", ogImageUrl, "property");
+    setMeta("og:url", window.location.href, "property");
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", description);
+    setMeta("twitter:image", ogImageUrl);
+
+    // JSON-LD structured data for the restaurant
+    const existingLd = document.getElementById("restaurant-jsonld");
+    if (existingLd) existingLd.remove();
+    const ld = document.createElement("script");
+    ld.id = "restaurant-jsonld";
+    ld.type = "application/ld+json";
+    ld.text = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      name: r.name,
+      description: description,
+      servesCuisine: r.cuisine ?? undefined,
+      telephone: r.phone ?? undefined,
+      email: r.email ?? undefined,
+      address: r.address
+        ? {
+            "@type": "PostalAddress",
+            streetAddress: r.address,
+            addressLocality: r.city ?? undefined,
+          }
+        : undefined,
+      url: window.location.href,
+      image: r.coverImageUrl ?? r.logoUrl ?? undefined,
+      acceptsReservations: "True",
+    });
+    document.head.appendChild(ld);
+
+    return () => {
+      // Clean up JSON-LD on unmount
+      const el = document.getElementById("restaurant-jsonld");
+      if (el) el.remove();
+    };
+  }, [data]);
 
   if (isLoading) {
     return (
