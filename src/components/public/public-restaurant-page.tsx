@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -17,10 +17,11 @@ import {
   Users,
   CheckCircle2,
   ExternalLink,
+  Navigation,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useNavigate } from "@/lib/router";
-import type { MenuItem } from "@/lib/types";
+import type { MenuItem, Category } from "@/lib/types";
 import { Logo } from "@/components/layout/logo";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,8 @@ import { toast } from "sonner";
 export function PublicRestaurantPage({ slug }: { slug: string }) {
   const navigate = useNavigate();
   const [resOpen, setResOpen] = useState(false);
+  const [activeCat, setActiveCat] = useState<string>("");
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["public-restaurant", slug],
@@ -96,7 +99,7 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
   }
 
   const { restaurant } = data;
-  const categories = restaurant.categories;
+  const categories = restaurant.categories.filter((c) => c.isActive);
   const items = restaurant.menuItems;
   const featured = items.filter((it) => it.isFeatured);
 
@@ -111,8 +114,8 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Minimal header */}
-      <header className="sticky top-0 z-30 h-14 border-b border-border/60 bg-background/80 backdrop-blur-lg flex items-center justify-between px-4">
-        <button onClick={() => navigate("/")}>
+      <header className="sticky top-0 z-40 h-14 border-b border-border/60 bg-background/80 backdrop-blur-lg flex items-center justify-between px-4">
+        <button onClick={() => navigate("/")} className="hover:opacity-80 transition-opacity">
           <Logo size="sm" />
         </button>
         <Button size="sm" onClick={() => setResOpen(true)}>
@@ -122,7 +125,7 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
       </header>
 
       {/* Cover */}
-      <div className="relative h-48 sm:h-64 lg:h-80 overflow-hidden bg-muted">
+      <div className="relative h-56 sm:h-72 lg:h-96 overflow-hidden bg-muted">
         {restaurant.coverImageUrl ? (
           <img
             src={restaurant.coverImageUrl}
@@ -132,11 +135,11 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/5 to-background" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
       </div>
 
-      {/* Restaurant info */}
-      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 -mt-16 relative z-10">
+      {/* Restaurant info card — overlaps cover */}
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 -mt-20 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,18 +147,21 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
         >
           <Card className="border-border/60 shadow-xl overflow-hidden">
             <CardContent className="p-5 sm:p-7">
-              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-5">
+                {/* Logo */}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border-2 border-card shadow-lg -mt-12 sm:-mt-16">
                   {restaurant.logoUrl ? (
                     <img
                       src={restaurant.logoUrl}
-                      alt=""
+                      alt={restaurant.name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <UtensilsCrossed className="w-8 h-8 text-primary" />
+                    <UtensilsCrossed className="w-9 h-9 text-primary" />
                   )}
                 </div>
+
+                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -166,33 +172,73 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
                     )}
                   </div>
                   {restaurant.description && (
-                    <p className="mt-2 text-muted-foreground text-sm sm:text-base max-w-2xl">
+                    <p className="mt-2 text-muted-foreground text-sm sm:text-base max-w-2xl leading-relaxed">
                       {restaurant.description}
                     </p>
                   )}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
-                    {restaurant.city && (
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {restaurant.city}
-                      </span>
+
+                  {/* Contact info grid — Telefon, Adres, Saatler */}
+                  <div className="mt-4 grid sm:grid-cols-2 gap-2.5">
+                    {restaurant.phone && (
+                      <a
+                        href={`tel:${restaurant.phone}`}
+                        className="flex items-center gap-2.5 text-sm group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Phone className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Telefon</p>
+                          <p className="font-medium truncate">{restaurant.phone}</p>
+                        </div>
+                      </a>
+                    )}
+                    {(restaurant.address || restaurant.city) && (
+                      <div className="flex items-start gap-2.5 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                          <MapPin className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Adres</p>
+                          <p className="font-medium">
+                            {restaurant.address}
+                            {restaurant.address && restaurant.city ? ", " : ""}
+                            {restaurant.city}
+                          </p>
+                        </div>
+                      </div>
                     )}
                     {restaurant.openTime && restaurant.closeTime && (
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        {restaurant.openTime} - {restaurant.closeTime}
-                      </span>
+                      <div className="flex items-center gap-2.5 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Clock className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Çalışma Saatleri</p>
+                          <p className="font-medium">{restaurant.openTime} - {restaurant.closeTime}</p>
+                        </div>
+                      </div>
                     )}
-                    {restaurant.phone && (
-                      <span className="flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5" />
-                        {restaurant.phone}
-                      </span>
+                    {restaurant.email && (
+                      <a
+                        href={`mailto:${restaurant.email}`}
+                        className="flex items-center gap-2.5 text-sm group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Mail className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">E-posta</p>
+                          <p className="font-medium truncate">{restaurant.email}</p>
+                        </div>
+                      </a>
                     )}
                   </div>
                 </div>
+
+                {/* Reserve button */}
                 <Button
-                  className="shrink-0"
+                  className="shrink-0 h-11"
                   onClick={() => setResOpen(true)}
                 >
                   <CalendarCheck className="w-4 h-4 mr-1" />
@@ -204,21 +250,32 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
         </motion.div>
       </div>
 
+      {/* Sticky category navigation */}
+      {grouped.length > 0 && (
+        <CategoryNav
+          grouped={grouped}
+          activeCat={activeCat}
+          setActiveCat={setActiveCat}
+          sectionRefs={sectionRefs}
+        />
+      )}
+
       {/* Menu */}
       <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 flex-1">
         {/* Featured */}
         {featured.length > 0 && (
-          <section className="mb-10">
-            <div className="flex items-center gap-2 mb-4">
+          <section className="mb-12">
+            <div className="flex items-center gap-2 mb-5">
               <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
               <h2 className="text-xl font-bold">Şefin Önerileri</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {featured.map((item) => (
+              {featured.map((item, i) => (
                 <FeaturedCard
                   key={item.id}
                   item={item}
                   currency={restaurant.currency}
+                  index={i}
                 />
               ))}
             </div>
@@ -229,32 +286,42 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
         {grouped.length === 0 ? (
           <Card className="border-dashed border-border/60">
             <CardContent className="py-16 text-center">
-              <UtensilsCrossed className="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" />
+              <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mx-auto mb-4">
+                <UtensilsCrossed className="w-7 h-7 text-primary/40" />
+              </div>
               <p className="font-medium">Menü hazırlanıyor</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Restoran henüz menüsünü eklememiş
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                Restoran henüz menüsünü eklememiş. Daha sonra tekrar ziyaret edebilirsin.
               </p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-12">
             {grouped.map((g) => (
-              <section key={g.category.id}>
-                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-border/60">
-                  <h2 className="text-xl font-bold">{g.category.name}</h2>
-                  <Badge variant="secondary">{g.items.length}</Badge>
-                  {g.category.description && (
-                    <span className="text-sm text-muted-foreground ml-2 hidden sm:inline">
-                      {g.category.description}
-                    </span>
-                  )}
+              <section
+                key={g.category.id}
+                id={`cat-${g.category.id}`}
+                ref={(el) => {
+                  sectionRefs.current[g.category.id] = el;
+                }}
+                className="scroll-mt-28"
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <h2 className="text-xl sm:text-2xl font-bold">{g.category.name}</h2>
+                  <Badge variant="secondary">{g.items.length} ürün</Badge>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {g.items.map((item) => (
-                    <MenuItemRow
+                {g.category.description && (
+                  <p className="text-sm text-muted-foreground mb-4 -mt-3">
+                    {g.category.description}
+                  </p>
+                )}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {g.items.map((item, i) => (
+                    <MenuProductCard
                       key={item.id}
                       item={item}
                       currency={restaurant.currency}
+                      index={i}
                     />
                   ))}
                 </div>
@@ -276,12 +343,85 @@ export function PublicRestaurantPage({ slug }: { slug: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Sticky category navigation
+// ---------------------------------------------------------------------------
+
+function CategoryNav({
+  grouped,
+  activeCat,
+  setActiveCat,
+  sectionRefs,
+}: {
+  grouped: { category: Category; items: MenuItem[] }[];
+  activeCat: string;
+  setActiveCat: (id: string) => void;
+  sectionRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
+}) {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const id = entry.target.id.replace("cat-", "");
+            setActiveCat(id);
+          }
+        }
+      },
+      { rootMargin: "-30% 0px -60% 0px", threshold: 0 }
+    );
+    Object.values(sectionRefs.current).forEach((el) => {
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [grouped, setActiveCat, sectionRefs]);
+
+  const handleClick = (id: string) => {
+    const el = sectionRefs.current[id];
+    if (el) {
+      const top = el.getBoundingClientRect().top + window.scrollY - 100;
+      window.scrollTo({ top, behavior: "smooth" });
+    }
+  };
+
+  if (grouped.length <= 1) return null;
+
+  return (
+    <div className="sticky top-14 z-30 border-y border-border/60 bg-background/90 backdrop-blur-lg">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="flex gap-1 overflow-x-auto scrollbar-thin py-2">
+          {grouped.map((g) => (
+            <button
+              key={g.category.id}
+              onClick={() => handleClick(g.category.id)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                activeCat === g.category.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+            >
+              {g.category.name}
+              <span className="ml-1.5 opacity-60 tabular-nums text-xs">{g.items.length}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Featured card (large photo)
+// ---------------------------------------------------------------------------
+
 function FeaturedCard({
   item,
   currency,
+  index,
 }: {
   item: MenuItem;
   currency: string;
+  index: number;
 }) {
   const tags = item.tags
     ? item.tags.split(",").map((t) => t.trim()).filter(Boolean)
@@ -291,9 +431,10 @@ function FeaturedCard({
       initial={{ opacity: 0, y: 12 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
+      transition={{ delay: index * 0.06 }}
     >
       <Card className="overflow-hidden border-border/60 hover:shadow-lg transition-shadow group h-full">
-        {item.imageUrl && (
+        {item.imageUrl ? (
           <div className="aspect-[16/10] overflow-hidden bg-muted">
             <img
               src={item.imageUrl}
@@ -301,11 +442,15 @@ function FeaturedCard({
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           </div>
+        ) : (
+          <div className="aspect-[16/10] bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+            <UtensilsCrossed className="w-10 h-10 text-primary/30" />
+          </div>
         )}
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold">{item.name}</h3>
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
+            <Star className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0 mt-0.5" />
           </div>
           {item.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
@@ -333,53 +478,78 @@ function FeaturedCard({
   );
 }
 
-function MenuItemRow({
+// ---------------------------------------------------------------------------
+// Menu product card — Fotoğraf, İsim, Açıklama, Fiyat (prominent)
+// ---------------------------------------------------------------------------
+
+function MenuProductCard({
   item,
   currency,
+  index,
 }: {
   item: MenuItem;
   currency: string;
+  index: number;
 }) {
   const tags = item.tags
     ? item.tags.split(",").map((t) => t.trim()).filter(Boolean)
     : [];
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/40 transition-colors">
-      {item.imageUrl ? (
-        <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted shrink-0">
-          <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
-        </div>
-      ) : (
-        <div className="w-14 h-14 rounded-lg bg-primary/5 flex items-center justify-center shrink-0">
-          <UtensilsCrossed className="w-5 h-5 text-primary/40" />
-        </div>
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="font-medium text-sm">{item.name}</h3>
-          <span className="font-semibold text-primary text-sm shrink-0">
-            {formatPrice(item.price, currency)}
-          </span>
-        </div>
-        {item.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-            {item.description}
-          </p>
-        )}
-        {tags.length > 0 && (
-          <div className="flex gap-1 mt-1.5">
-            {tags.map((t) => (
-              <Badge key={t} variant="outline" className="text-[10px] gap-0.5 py-0 px-1.5">
-                <Leaf className="w-2.5 h-2.5" />
-                {t}
-              </Badge>
-            ))}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-30px" }}
+      transition={{ delay: Math.min(index * 0.04, 0.3) }}
+    >
+      <Card className="overflow-hidden border-border/60 hover:shadow-md transition-shadow group h-full flex flex-col">
+        {/* Fotoğraf */}
+        {item.imageUrl ? (
+          <div className="aspect-[4/3] overflow-hidden bg-muted">
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          </div>
+        ) : (
+          <div className="aspect-[4/3] bg-gradient-to-br from-primary/8 to-primary/3 flex items-center justify-center">
+            <UtensilsCrossed className="w-10 h-10 text-primary/25" />
           </div>
         )}
-      </div>
-    </div>
+        <CardContent className="p-4 flex-1 flex flex-col">
+          {/* İsim */}
+          <h3 className="font-semibold leading-tight">{item.name}</h3>
+          {/* Açıklama */}
+          {item.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-1 flex-1">
+              {item.description}
+            </p>
+          )}
+          {/* Fiyat + tags */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
+            <span className="font-bold text-primary text-base">
+              {formatPrice(item.price, currency)}
+            </span>
+            {tags.length > 0 && (
+              <div className="flex gap-1">
+                {tags.map((t) => (
+                  <Badge key={t} variant="outline" className="text-[10px] gap-0.5 py-0 px-1.5">
+                    <Leaf className="w-2.5 h-2.5" />
+                    {t}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Reservation dialog
+// ---------------------------------------------------------------------------
 
 function ReservationDialog({
   open,

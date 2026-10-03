@@ -726,3 +726,64 @@ Priority recommendations for next phase:
 2. Ürün drag/drop sıralama (kategori içinde)
 3. Toplu ürün import/export (CSV)
 4. Menü önizleme (public sayfa olarak)
+
+---
+Task ID: public-page-1
+Agent: main
+Task: Public restoran sayfasını spec'e uyumlulaştır — logo, cover, adres, sticky kategori nav, prominent ürün kartları
+
+Work Log:
+- Mevcut public-restaurant-page.tsx okundu (temel yapı var ama adres sadece city gösteriyordu, ürünler compacttı)
+- **Public restaurant page yeniden tasarlandı**:
+  - **Cover**: daha büyük (h-56 sm:h-72 lg:h-96), gradient overlay (from-black/70)
+  - **Logo**: 20x20 sm:24x24, overlap cover ile, border-2 + shadow, -mt-12/16 ile cover'a taşan efekt
+  - **Restaurant info card**: overlap cover (-mt-20), shadow-xl
+    - **İsim** (h1) + cuisine badge + **Açıklama** (leading-relaxed)
+    - **Contact info grid** (sm:grid-cols-2): her biri icon box + label + value
+      - **Telefon** (Phone icon, clickable tel: link)
+      - **Adres** (MapPin icon, full address + city: "Bağdat Caddesi No: 142, Kadıköy, İstanbul")
+      - **Çalışma Saatleri** (Clock icon, openTime - closeTime)
+      - **E-posta** (Mail icon, clickable mailto: link)
+    - Rezerve Et butonu (shrink-0, h-11)
+  - **Sticky category navigation** (top-14, backdrop-blur):
+    - CategoryNav component: category name + count badge, scroll-mt-28
+    - IntersectionObserver ile active category highlight (rootMargin -30%/-60%)
+    - Click → smooth scroll to section (window.scrollTo with offset -100)
+    - Sadece >1 kategori varsa göster
+  - **Şefin Önerileri** (featured): large cards (16:10 photo, hover scale, Star badge)
+  - **Menu product cards** (spec: Fotoğraf, İsim, Açıklama, Fiyat):
+    - **Fotoğraf**: 4:3 aspect, object-cover, hover scale 105, gradient placeholder (UtensilsCrossed icon)
+    - **İsim**: font-semibold
+    - **Açıklama**: text-xs, line-clamp-2, flex-1
+    - **Fiyat**: font-bold text-primary text-base, border-top separator
+    - Tag badges (Leaf icon)
+    - Scroll reveal animation (whileInView, stagger delay)
+  - Category section: heading + item count badge + description
+  - Empty state: "Menü hazırlanıyor" + açıklama
+  - Reservation dialog korundu (tüm alanlar)
+  - isActive filter: sadece aktif kategoriler gösterilir
+
+Stage Summary:
+- ✅ Restaurant logo + cover (overlap effect, shadow)
+- ✅ Restaurant adı + açıklama (prominent)
+- ✅ Telefon (clickable tel:), Adres (full address + city), Çalışma saatleri, E-posta (clickable mailto:)
+- ✅ Menü: Kategoriler (sticky nav with active highlight + smooth scroll)
+- ✅ Ürünler: Fotoğraf, İsim, Açıklama, Fiyat (prominent card layout, 4:3 photos)
+- ✅ agent-browser ile doğrulandı:
+  - Cover + logo + info card render
+  - Contact grid: TELEFON +90 212 555 0100, ADRES Bağdat Caddesi No: 142 Kadıköy İstanbul, ÇALIŞMA 12:00-23:00, E-POSTA merhaba@...
+  - Sticky category nav: Başlangıçlar(3), Ana Yemekler(3), Tatlılar(3)
+  - Tatlılar'a tıkla → smooth scroll → Crème Brûlée, Çikolata Fondan, Tiramisu göster
+  - Şefin Önerileri: 4 featured ürün (Burrata, Dana Cheek, Trüf Risotto, Çikolata Fondan)
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+- VLM: 8/10 polish, "modern, clean, good typography/spacing, overlapping card effect executed well"
+
+Unresolved issues / risks:
+- Demo menü ürünlerinin fotoğrafı yok (placeholder icon gösterir). Menü yönetiminden fotoğraf yüklenince public sayfada da görünür.
+- Sticky nav top-14 (header h-14 altında), scroll-mt-28 ile section offset
+
+Priority recommendations for next phase:
+1. Public sayfaya sosyal medya paylaşım butonları
+2. Menü PDF export
+3. Online sipariş (menüden sepete ekle)
+4. Müşteri yorumları / puanlama
