@@ -787,3 +787,46 @@ Priority recommendations for next phase:
 2. Menü PDF export
 3. Online sipariş (menüden sepete ekle)
 4. Müşteri yorumları / puanlama
+
+---
+Task ID: public-reservation-realtime-1
+Agent: main
+Task: Public rezervasyon → admin dashboard gerçek zamanlı görünüm (real-time polling)
+
+Work Log:
+- Public reservation form zaten tüm spec alanlarına sahip (Ad Soyad, Telefon, E-posta, Tarih, Saat, Kişi Sayısı) — önceki tasklarda eklendi
+- Supabase Realtime yerine **polling-based real-time** uygulandı (credentials yok):
+  - **Reservations view**: `refetchInterval: 10000` (10 sn) + `refetchOnWindowFocus: true`
+  - **Dashboard overview**: `refetchInterval: 15000` (15 sn) + `refetchOnWindowFocus: true`
+- **"Canlı" (Live) indicator** reservations header'a eklendi:
+  - Pulse animasyonlu yeşil dot (animate-ping) + "Canlı" label
+  - Subtitle: "10 sn'de bir otomatik yenilenir"
+- **New online reservation detection**:
+  - `prevOnlineCountRef` ile önceki online rezervasyon sayısı tracked
+  - Sayı artınca toast notification: "🛎️ Yeni online rezervasyon!" + customer name + guest count + date/time, 6 sn duration
+  - İlk load'da notify etmez (sadece initial count stored)
+  - Sadece `source === "online"` rezervasyonlar için (public sayfadan gelenler)
+
+Stage Summary:
+- ✅ Public reservation form: Ad Soyad, Telefon, E-mail, Tarih, Saat, Kişi sayısı (tüm spec alanları)
+- ✅ Rezervasyon Prisma DB'ye kaydedilir (Supabase yerine)
+- ✅ Admin panel'de anında görünür — 10 sn polling ile auto-refresh
+- ✅ "Canlı" indicator: pulse dot + "10 sn'de bir otomatik yenilenir"
+- ✅ Toast notification: yeni online rezervasyon geldiğinde "🛎️ Yeni online rezervasyon!"
+- ✅ End-to-end doğrulandı:
+  - Dashboard'da 3 rezervasyon görünüyor
+  - Public API ile yeni rezervasyon oluşturuldu (Realtime Test Müşteri, 3 kişi, online source)
+  - 12 sn sonra dashboard auto-refresh → 4 rezervasyon, "Realtime Test Müşteri" "Online talep" badge ile göründü
+  - Test rezervasyonu temizlendi
+- ✅ Dashboard overview da 15 sn polling ile auto-refresh (Bugünkü Rezervasyonlar, Aktif Masalar, Misafir sayısı hep güncel)
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+
+Unresolved issues / risks:
+- Polling 10/15 sn — Supabase Realtime olsaydı anlık olurdu. MVP için yeterli.
+- Toast sadece dashboard açıkken gösterilir (background tab'da görünmez)
+
+Priority recommendations for next phase:
+1. WebSocket mini-service ile gerçek anlık push (Supabase Realtime yerine)
+2. Browser notification API (background tab'da bile bildirim)
+3. Sesli uyarı (yeni rezervasyon geldiğinde "ding" sesi)
+4. Rezervasyon saat çakışma kontrolü

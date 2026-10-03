@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +18,8 @@ import {
   X as XIcon,
   Clock,
   LayoutGrid,
+  Radio,
+  Bell,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useRestaurantStore } from "@/stores/restaurant-store";
@@ -109,6 +111,10 @@ export function ReservationsView() {
     queryKey: ["reservations", current?.id],
     queryFn: () => api.listReservations(current!.id),
     enabled: !!current,
+    // Real-time polling — checks for new reservations every 10 seconds
+    // (Supabase Realtime equivalent; auto-refreshes the dashboard)
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
   });
   const { data: tableData } = useQuery({
     queryKey: ["tables", current?.id],
@@ -118,6 +124,36 @@ export function ReservationsView() {
 
   const tables = tableData?.tables ?? [];
   const reservations = resData?.reservations ?? [];
+
+  // Real-time: detect new online reservations and notify
+  const prevOnlineCountRef = useRef<number | null>(null);
+  const onlineReservations = reservations.filter((r) => r.source === "online");
+  const newOnlineCount = onlineReservations.length;
+
+  useEffect(() => {
+    if (prevOnlineCountRef.current === null) {
+      // First load — just store the count, don't notify
+      prevOnlineCountRef.current = newOnlineCount;
+      return;
+    }
+    if (newOnlineCount > prevOnlineCountRef.current) {
+      const diff = newOnlineCount - prevOnlineCountRef.current;
+      const latest = onlineReservations
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        .slice(0, diff);
+      if (latest.length > 0) {
+        const name = latest[0].customerName;
+        toast.success("🛎️ Yeni online rezervasyon!", {
+          description: `${name} — ${latest[0].guestCount} kişi · ${latest[0].reservationDate} ${latest[0].reservationTime}`,
+          duration: 6000,
+        });
+      }
+    }
+    prevOnlineCountRef.current = newOnlineCount;
+  }, [newOnlineCount, onlineReservations]);
 
   const today = todayISO();
   const tomorrow = new Date(Date.now() + 86400000)
@@ -221,11 +257,22 @@ export function ReservationsView() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Rezervasyonlar
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Rezervasyonlar
+            </h1>
+            {/* Live indicator — real-time polling active */}
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600">
+              <span className="relative flex w-2 h-2">
+                <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                <span className="relative w-2 h-2 rounded-full bg-emerald-500" />
+              </span>
+              Canlı
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
-            Gelen talepleri yönet, durumlarını güncelle
+            Gelen talepleri yönet, durumlarını güncelle · 10 sn'de bir otomatik
+            yenilenir
           </p>
         </div>
         <Button onClick={() => setDialog({ open: true, res: null })}>

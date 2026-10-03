@@ -45,6 +45,10 @@ export function OverviewView() {
     queryKey: ["dashboard", current?.id],
     queryFn: () => api.dashboard(current!.id),
     enabled: !!current,
+    // Real-time polling — auto-refresh dashboard every 15 seconds
+    // (Supabase Realtime equivalent)
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   if (isLoading || !data) {
