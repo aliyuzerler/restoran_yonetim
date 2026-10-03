@@ -614,3 +614,57 @@ Priority recommendations for next phase:
 2. Toplu durum güncelleme (checkbox ile çoklu seçim)
 3. Rezervasyon detay paneli (side drawer)
 4. CSV/export özelliği
+
+---
+Task ID: tables-management-1
+Agent: main
+Task: Masa yönetim sayfasını modern kart/grid görünümü ile yeniden tasarla
+
+Work Log:
+- Mevcut tables-view.tsx okundu (fonksiyonel ama sade kart tasarımı)
+- **TableCard component yeniden tasarlandı** (modern, prominent):
+  - 4px color-coded top border (durum rengine göre)
+  - Subtle radial glow at top (durum rengine göre opacity 10%)
+  - Armchair icon + büyük "Masa N" heading + "X kişi" kapasite (Users icon)
+  - Prominent status badge: pulse animasyonlu dot (aktif durumlar için) + kalın renkli label, durum rengi tint'li background
+  - Notes (italic, line-clamp-2)
+  - **Quick-action status toggle**: 4 buton grid (Müsait/Dolu/Rezerve/Pasif) — tek tıkla durum değiştirme. Her buton: dot + label, active state renkli tint, hover opacity. "DURUMU DEĞİŞTİR" label üstünde.
+  - Hover: y-3 lift animasyonu (spring)
+  - More menu (⋮): Düzenle / Sil
+- **Status summary cards** (üstte, tıklanabilir filtre olarak):
+  - 4 durum (Müsait/Dolu/Rezerve/Pasif, cleaning hariç) — her biri kart
+  - Tıklayınca o duruma filtrele, tekrar tıklayınca temizle
+  - "filtreli" badge active durumda
+  - whileHover y-2, whileTap scale 0.97
+- **Capacity strip**: toplam masa sayısı (Armchair icon) + toplam kapasite (Users icon) + dolu koltuk sayısı (rose dot). Filtre active iken "Filtreyi temizle" butonu.
+- **Empty state**: büyük icon, açıklama, "İlk Masayı Ekle" butonu
+- **Filter empty state**: "Bu filtreye uygun masa yok" + "Filtreyi temizle"
+- **Create/edit dialog**: Masa Numarası + Kapasite (Users icon'lu), Lokasyon, Durum (color-dot'lu select), Notlar. Armchair icon başlıkta. "Sonraki uygun numara" hint.
+- AnimatePresence ile card enter/exit, motion.tr layout animations
+- useMutation ile status update → invalidate tables + dashboard
+
+Stage Summary:
+- ✅ Kart formatı spec'teki gibi: "Masa 1" + "2 kişi" + "Müsait" (prominent status badge)
+- ✅ Modern card/grid görünümü: 4 durum renk border, glow, Armchair icon, pulse dot
+- ✅ Quick-action status toggle: 4 buton (Müsait/Dolu/Rezerve/Pasif) tek tıkla değiştir
+- ✅ Yeni masa ekle / düzenle / sil — hepsi çalışıyor
+- ✅ Status summary cards: tıklanabilir filtre (4 Müsait, 1 Dolu, 1 Rezerve, 1 Pasif)
+- ✅ Capacity strip: 7 masa, 28 toplam kapasite, dolu koltuk sayısı
+- ✅ Empty state + filter empty state
+- ✅ agent-browser ile doğrulandı:
+  - Kartlar Masa N / X kişi / Status formatında
+  - Quick status change: Masa 3 Dolu→Rezerve→Dolu (instant, summary counts live update)
+  - Status filter: "Müsait" tıkla → sadece 4 müsait masa, "filtreli" badge + temizle butonu
+  - Create modal: tüm alanlar (Masa Numarası, Kapasite, Lokasyon, Durum, Notlar)
+- ✅ Lint: 0 error, 2 warning (RHF — zararsız)
+- VLM: 8/10 polish, "clean aesthetic, good use of whitespace, clear hierarchy, nice color coding"
+
+Unresolved issues / risks:
+- Quick-action butonlar 4 spec durumunu gösteriyor (available/occupied/reserved/inactive). "Temizlik" durumu dialog'dan seçilebilir ama quick toggle'da yok (nadir durum).
+- VLM quick-action butonları screenshot'ta net göremedi ama snapshot ile doğrulandı (4 button per card)
+
+Priority recommendations for next phase:
+1. Masa kat planı (görsel floor plan editor — drag-drop masa yerleşimi)
+2. Masa bazlı rezervasyon takvimi (hangı masa ne zaman dolu)
+3. QR code ile masa bazlı menü siparişi
+4. Toplu masa ekleme (range: 1-10 arası tek seferde)
