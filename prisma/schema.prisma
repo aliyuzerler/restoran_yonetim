@@ -1,0 +1,146 @@
+// Prisma schema for Restaurant Management SaaS
+// learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String   @default("owner") // owner | staff
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     Session[]
+  restaurants  Restaurant[]
+  reservations Reservation[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Restaurant {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  cuisine     String?
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  coverImage  String?
+  logoImage   String?
+  openTime    String?  // "09:00"
+  closeTime   String?  // "23:00"
+  currency    String   @default("₺")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  categories  Category[]
+  menuItems   MenuItem[]
+  tables      Table[]
+  reservations Reservation[]
+
+  @@index([ownerId])
+}
+
+model Category {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  sortOrder    Int      @default(0)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  menuItems    MenuItem[]
+
+  @@index([restaurantId])
+}
+
+model MenuItem {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  image        String?
+  isAvailable  Boolean  @default(true)
+  isFeatured   Boolean  @default(false)
+  tags         String?  // comma separated: "vegan,spicy"
+  sortOrder    Int      @default(0)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([restaurantId])
+  @@index([categoryId])
+}
+
+model Table {
+  id           String   @id @default(cuid())
+  name         String   // "Masa 1", "Pencere Kenarı 2"
+  capacity     Int      @default(4)
+  location     String?  // "İç Salon", "Teras", "Bahçe"
+  status       String   @default("available") // available | occupied | reserved | cleaning
+  notes        String?
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reservations Reservation[]
+
+  @@index([restaurantId])
+}
+
+model Reservation {
+  id           String   @id @default(cuid())
+  customerName String
+  customerPhone String?
+  customerEmail String?
+  partySize    Int      @default(2)
+  date         String   // "2025-01-15"
+  time         String   // "19:30"
+  status       String   @default("pending") // pending | confirmed | seated | completed | cancelled | no_show
+  notes        String?
+  source       String   @default("manual") // manual | online
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId      String?
+  table        Table?    @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  userId       String?  // staff who created/owns it
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([restaurantId])
+  @@index([tableId])
+  @@index([userId])
+  @@index([status])
+  @@index([date])
+}
