@@ -17,6 +17,8 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  CalendarDays,
+  BarChart3,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useNavigate, useRoute, type Route } from "@/lib/router";
@@ -52,12 +54,16 @@ import { MenuView } from "./views/menu-view";
 import { TablesView } from "./views/tables-view";
 import { ReservationsView } from "./views/reservations-view";
 import { SettingsView } from "./views/settings-view";
+import { CalendarView } from "./views/calendar-view";
+import { AnalyticsView } from "./views/analytics-view";
 
 const NAV = [
   { tab: "overview", label: "Genel Bakış", icon: LayoutDashboard },
   { tab: "menu", label: "Menü", icon: UtensilsCrossed },
   { tab: "tables", label: "Masalar", icon: LayoutGrid },
   { tab: "reservations", label: "Rezervasyonlar", icon: CalendarCheck },
+  { tab: "calendar", label: "Takvim", icon: CalendarDays },
+  { tab: "analytics", label: "Analitik", icon: BarChart3 },
   { tab: "settings", label: "Ayarlar", icon: Settings },
 ] as const;
 
@@ -219,13 +225,13 @@ export function DashboardShell() {
                 <button
                   key={item.tab}
                   onClick={() => goTab(item.tab)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                     active
                       ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-foreground/70 hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <item.icon className="w-4 h-4" />
+                  <item.icon className={`w-4 h-4 ${active ? "" : "text-muted-foreground"}`} />
                   {item.label}
                 </button>
               );
@@ -302,6 +308,8 @@ export function DashboardShell() {
               {activeTab === "menu" && <MenuView />}
               {activeTab === "tables" && <TablesView />}
               {activeTab === "reservations" && <ReservationsView />}
+              {activeTab === "calendar" && <CalendarView />}
+              {activeTab === "analytics" && <AnalyticsView />}
               {activeTab === "settings" && <SettingsView />}
             </motion.div>
           </AnimatePresence>

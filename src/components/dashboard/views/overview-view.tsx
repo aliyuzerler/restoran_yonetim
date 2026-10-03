@@ -21,6 +21,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  CartesianGrid,
   PieChart,
   Pie,
   Cell,
@@ -157,15 +158,28 @@ export function OverviewView() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[260px] -ml-2">
+            <div className="h-[260px] -ml-2 pl-2">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
+                <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 4 }}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={1} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.55} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    stroke="var(--border)"
+                    strokeOpacity={0.5}
+                  />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
                     axisLine={false}
                     fontSize={12}
                     stroke="var(--muted-foreground)"
+                    dy={6}
                   />
                   <YAxis
                     tickLine={false}
@@ -173,6 +187,7 @@ export function OverviewView() {
                     fontSize={12}
                     stroke="var(--muted-foreground)"
                     allowDecimals={false}
+                    width={28}
                   />
                   <Tooltip
                     contentStyle={{
@@ -181,12 +196,13 @@ export function OverviewView() {
                       background: "var(--popover)",
                       color: "var(--popover-foreground)",
                       fontSize: 12,
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
                     }}
-                    cursor={{ fill: "var(--accent)" }}
+                    cursor={{ fill: "var(--accent)", fillOpacity: 0.4 }}
                   />
                   <Bar
                     dataKey="rezervasyon"
-                    fill="var(--primary)"
+                    fill="url(#barGradient)"
                     radius={[6, 6, 0, 0]}
                     maxBarSize={48}
                   />

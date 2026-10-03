@@ -84,3 +84,53 @@ src/components/providers/{providers,app-loader}.tsx
 5. Çoklu dil (i18n) — arayüz zaten Türkçe
 6. Satış/istatistik raporları (menü popülerliği)
 7. Personel/rol yönetimi (owner/staff)
+
+---
+Task ID: webDevReview-1
+Agent: webDevReview (cron)
+Task: QA testi via agent-browser + bug fix + yeni özellikler (takvim, analitik, QR paylaşım)
+
+Work Log:
+- worklog.md okundu, mevcut durum stable olarak değerlendirildi
+- agent-browser + VLM (z-ai vision) ile 8 ekran görüntüsü alınıp analiz edildi
+- Tespit edilen QA sorunları:
+  1. Settings sayfasında sticky "Kaydet" butonu içeriği örtüyordu (critical z-index/positioning bug)
+  2. Dashboard bar chart alttan kesiliyordu (margin/grid eksik)
+  3. Menü kartında uzun isimler "truncate" ile kesiliyordu
+  4. Sidebar inactive item kontrastı düşüktü
+- Bug fix'ler uygulandı:
+  - Settings: sticky floating button → fixed bottom action bar (backdrop blur + border + İptal butonu)
+  - Overview: BarChart'a CartesianGrid, gradient fill, margin, dy eklendi
+  - Menu ItemCard: truncate → line-clamp-2 (uzun isimler artık 2 satıra kayıyor)
+  - Sidebar: inactive items `text-foreground/70`, ikonlar `text-muted-foreground` ile kontrast artırıldı
+- Yeni özellikler eklendi:
+  1. **Rezervasyon Takvimi** (calendar-view): Aylık grid, günlük rezervasyon sayısı, yoğunluk renk intensity'si (az/orta/yoğun), güne tıklayınca o günün rezervasyonlarını gösteren dialog, ay navigasyonu, Bugün butonu, ay bazlı istatistik (rezervasyon/misafir sayısı), doluluk legend'i
+  2. **Analitik sayfası** (analytics-view): 4 KPI kartı (tahmini gelir, misafir, dönüşüm oranı, masa doluluk), aylık trend area chart (2 seri: rezervasyon + misafir), kaynak dağılımı donut chart (online vs manuel), yoğun saatler bar chart, popüler ürünler listesi (medalya sıralaması), kategori dağılımı progress bar'lar, altta 3 ek KPI kartı
+  3. **QR kod paylaşımı** (settings içinde): QRCodeSVG ile public link QR'ı, linki kopyala, QR SVG indir, native Paylaş API, sayfayı aç butonu
+- Backend:
+  - `/api/analytics` endpoint eklendi (popülerlik skorlama, gelir tahmini, yoğun saatler, aylık trend, kaynak dağılımı, kategori istatistikleri)
+  - Gelir hesabı: realized (confirmed+seated+completed) ve potential (all) olarak ayrıldı
+- Tipler: AnalyticsData tipi eklendi, api.ts'e analytics metodu eklendi
+- qrcode.react paketi kuruldu (qrcode.react@4.2.0)
+
+Stage Summary:
+- ✅ Tüm 7 dashboard sekmesi yükleniyor ve render oluyor (Genel Bakış, Menü, Masalar, Rezervasyonlar, Takvim, Analitik, Ayarlar)
+- ✅ Settings kritik bug düzeltildi: kaydet butonu artık içeriği örtmüyor (DOM ölçümü ile doğrulandı: gap 465px)
+- ✅ QR kod render oluyor, link kopyalama çalışıyor
+- ✅ Takvim: güne tıklayınca o günün 4 rezervasyonu dialog'da gösteriliyor
+- ✅ Analitik: area chart + donut chart + bar chart + progress bar'lar hepsi veri ile render oluyor
+- ✅ Lint temiz, dev log'da runtime hatası yok
+- VLM ile doğrulandı: "Delete button fully visible, not covered" / "Both charts fully rendered with actual data"
+
+Unresolved issues / risks:
+- Analitik revenue tahmini "avgPrice * guests" yaklaşıksık (gerçek sipariş verisi yok). İleride gerçek sipariş/satış takibi eklenirse daha doğru olur.
+- Takvim "prev/next" ay limitleri ±12 ay (yeterli MVP için)
+- QR indirme SVG formatında (PNG de eklenebilir)
+
+Priority recommendations for next phase:
+1. Masa kat planı (görsel drag-drop floor plan editor)
+2. Rezervasyon bildirimleri (e-posta) — şu an bildirim yok
+3. Personel/rol yönetimi (owner/staff davet, yetkilendirme)
+4. Gerçek sipariş/satış takibi ile analitik gelir verisini doğru yap
+5. Çoklu dil (i18n) desteği
+6. Rezervasyon saat çakışma kontrolü (aynı masaya aynı saatte iki rezervasyon engeli)

@@ -1,4 +1,5 @@
 import type {
+  AnalyticsData,
   Category,
   DashboardStats,
   MenuItem,
@@ -145,6 +146,10 @@ export const api = {
   // ---- Dashboard ----
   dashboard: (restaurantId: string) =>
     request<DashboardStats>(`/api/dashboard?restaurantId=${restaurantId}`),
+
+  // ---- Analytics ----
+  analytics: (restaurantId: string) =>
+    request<AnalyticsData>(`/api/analytics?restaurantId=${restaurantId}`),
 
   // ---- Public ----
   publicRestaurant: (slug: string) =>

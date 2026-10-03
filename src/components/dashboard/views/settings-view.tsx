@@ -15,7 +15,12 @@ import {
   Coins,
   Globe,
   Loader2,
+  QrCode,
+  Copy,
+  Download,
+  Share2,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { api } from "@/lib/api";
 import { useRestaurantStore } from "@/stores/restaurant-store";
 import { useNavigate } from "@/lib/router";
@@ -26,7 +31,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,8 +90,10 @@ export function SettingsView() {
 
   if (!current) return null;
 
+  const publicUrl = `${window.location.origin}/#/r/${current.slug}`;
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto pb-28">
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           Restoran Ayarları
@@ -330,24 +336,118 @@ export function SettingsView() {
           </CardContent>
         </Card>
 
-        {/* Save button */}
-        <div className="flex justify-end gap-3 sticky bottom-4">
-          <Button
-            size="lg"
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-            className="shadow-lg"
-          >
-            {mutation.isPending ? (
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-1" />
-            )}
-            Değişiklikleri Kaydet
-          </Button>
-        </div>
-
-        <Separator />
+        {/* QR Code sharing */}
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <QrCode className="w-4 h-4 text-primary" />
+              Paylaş & QR Kod
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row items-center gap-5">
+              <div className="p-3 bg-white rounded-xl border border-border/60 shadow-sm shrink-0">
+                <QRCodeSVG
+                  value={publicUrl}
+                  size={128}
+                  level="M"
+                  fgColor="#1a1410"
+                  bgColor="#ffffff"
+                />
+              </div>
+              <div className="flex-1 min-w-0 w-full">
+                <p className="text-sm font-medium">Public sayfa linki</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Müşterilerin menüyü görüp rezervasyon yapabileceği adres
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={publicUrl}
+                    readOnly
+                    className="text-xs font-mono h-9"
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(publicUrl);
+                      toast.success("Link kopyalandı");
+                    }}
+                    title="Linki kopyala"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/r/${current.slug}`)}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                    Sayfayı Aç
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const svg = document.querySelector(
+                        "#qr-download-target svg"
+                      ) as SVGElement | null;
+                      if (!svg) return;
+                      const data = new XMLSerializer().serializeToString(svg);
+                      const blob = new Blob([data], {
+                        type: "image/svg+xml;charset=utf-8",
+                      });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${current.slug}-qr.svg`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success("QR kod indirildi");
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" />
+                    QR İndir
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator
+                          .share({
+                            title: current.name,
+                            text: `${current.name} - Menü ve Rezervasyon`,
+                            url: publicUrl,
+                          })
+                          .catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(publicUrl);
+                        toast.success("Link kopyalandı (paylaşım desteklenmiyor)");
+                      }
+                    }}
+                  >
+                    <Share2 className="w-3.5 h-3.5 mr-1" />
+                    Paylaş
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div id="qr-download-target" className="hidden">
+              <QRCodeSVG
+                value={publicUrl}
+                size={512}
+                level="M"
+                fgColor="#1a1410"
+                bgColor="#ffffff"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Danger zone */}
         <Card className="border-destructive/30">
@@ -376,6 +476,37 @@ export function SettingsView() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Sticky save action bar */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-60 z-30 border-t border-border bg-background/90 backdrop-blur-lg">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground hidden sm:block">
+            Değişiklikler otomatik kaydedilmez — kaydetmeyi unutma
+          </p>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/dashboard")}
+              className="h-10"
+            >
+              İptal
+            </Button>
+            <Button
+              size="lg"
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+              className="h-10 shadow-md"
+            >
+              {mutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-1" />
+              )}
+              Değişiklikleri Kaydet
+            </Button>
+          </div>
+        </div>
       </div>
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

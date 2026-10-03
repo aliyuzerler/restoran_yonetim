@@ -425,10 +425,12 @@ function ItemCard({
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className="font-semibold truncate">{item.name}</h3>
+            <div className="flex items-start gap-1.5">
+              <h3 className="font-semibold leading-tight line-clamp-2 flex-1 min-w-0">
+                {item.name}
+              </h3>
               {item.isFeatured && (
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0 mt-0.5" />
               )}
             </div>
             {item.description && (

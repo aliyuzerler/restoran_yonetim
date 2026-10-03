@@ -115,3 +115,36 @@ export type DashboardStats = {
   tablesByStatus: Record<string, number>;
   upcoming: Reservation[];
 };
+
+export type AnalyticsData = {
+  currency: string;
+  kpis: {
+    totalGuests: number;
+    completedGuests: number;
+    avgPrice: number;
+    estimatedRevenue: number;
+    potentialRevenue: number;
+    conversionRate: number;
+    tableUtilization: number;
+    onlineReservations: number;
+    manualReservations: number;
+  };
+  busyHours: { slot: string; label: string; count: number }[];
+  popularity: {
+    id: string;
+    name: string;
+    price: number;
+    categoryName: string;
+    isFeatured: boolean;
+    isAvailable: boolean;
+    score: number;
+  }[];
+  categoryStats: {
+    name: string;
+    itemCount: number;
+    avgPrice: number;
+    featuredCount: number;
+  }[];
+  months: { label: string; count: number; guests: number }[];
+  sources: { online: number; manual: number };
+};
