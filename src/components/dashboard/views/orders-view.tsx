@@ -76,7 +76,23 @@ export function OrdersView() {
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
       api.updateOrderStatus(id, status),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["orders"] });
+      const prev = qc.getQueryData<{ orders: Order[] }>(["orders", current?.id]);
+      if (prev) {
+        qc.setQueryData(["orders", current?.id], {
+          ...prev,
+          orders: prev.orders.map((o) =>
+            o.id === id ? { ...o, status } : o
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["orders", current?.id], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["orders"] });
     },
   });

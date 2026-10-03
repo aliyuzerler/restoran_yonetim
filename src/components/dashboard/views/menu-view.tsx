@@ -117,19 +117,49 @@ export function MenuView() {
   const reorderMutation = useMutation({
     mutationFn: (orderedIds: string[]) =>
       api.reorderCategories(current!.id, orderedIds),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["categories"] });
+    onMutate: async (orderedIds) => {
+      await qc.cancelQueries({ queryKey: ["categories"] });
+      const prev = qc.getQueryData<{ categories: Category[] }>(["categories", current?.id]);
+      if (prev) {
+        qc.setQueryData(["categories", current?.id], {
+          ...prev,
+          categories: orderedIds.map((id, idx) => {
+            const c = prev.categories.find((x) => x.id === id);
+            return c ? { ...c, sortOrder: idx } : c!;
+          }).filter(Boolean),
+        });
+      }
+      return { prev };
     },
-    onError: () => {
-      qc.invalidateQueries({ queryKey: ["categories"] });
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["categories", current?.id], ctx.prev);
       toast.error("Sıralama kaydedilemedi");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["categories"] });
     },
   });
 
   const toggleAvailable = useMutation({
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       api.updateMenuItem(id, { isAvailable: value }),
-    onSuccess: () => {
+    onMutate: async ({ id, value }) => {
+      await qc.cancelQueries({ queryKey: ["menu-items"] });
+      const prev = qc.getQueryData<{ items: MenuItem[] }>(["menu-items", current?.id]);
+      if (prev) {
+        qc.setQueryData(["menu-items", current?.id], {
+          ...prev,
+          items: prev.items.map((it) =>
+            it.id === id ? { ...it, isAvailable: value } : it
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["menu-items", current?.id], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["menu-items"] });
     },
   });
@@ -137,7 +167,23 @@ export function MenuView() {
   const toggleFeatured = useMutation({
     mutationFn: ({ id, value }: { id: string; value: boolean }) =>
       api.updateMenuItem(id, { isFeatured: value }),
-    onSuccess: () => {
+    onMutate: async ({ id, value }) => {
+      await qc.cancelQueries({ queryKey: ["menu-items"] });
+      const prev = qc.getQueryData<{ items: MenuItem[] }>(["menu-items", current?.id]);
+      if (prev) {
+        qc.setQueryData(["menu-items", current?.id], {
+          ...prev,
+          items: prev.items.map((it) =>
+            it.id === id ? { ...it, isFeatured: value } : it
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["menu-items", current?.id], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["menu-items"] });
     },
   });

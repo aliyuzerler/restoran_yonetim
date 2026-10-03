@@ -246,7 +246,23 @@ export function ReservationsView() {
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: ReservationStatus }) =>
       api.updateReservation(id, { status }),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["reservations"] });
+      const prev = qc.getQueryData<{ reservations: Reservation[] }>(["reservations", current?.id]);
+      if (prev) {
+        qc.setQueryData(["reservations", current?.id], {
+          ...prev,
+          reservations: prev.reservations.map((r) =>
+            r.id === id ? { ...r, status } : r
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["reservations", current?.id], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["reservations"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },

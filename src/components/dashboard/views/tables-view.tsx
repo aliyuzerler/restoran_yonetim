@@ -88,7 +88,23 @@ export function TablesView() {
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TableStatus }) =>
       api.updateTable(id, { status }),
-    onSuccess: () => {
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["tables"] });
+      const prev = qc.getQueryData<{ tables: Table[] }>(["tables", current?.id]);
+      if (prev) {
+        qc.setQueryData(["tables", current?.id], {
+          ...prev,
+          tables: prev.tables.map((t) =>
+            t.id === id ? { ...t, status } : t
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["tables", current?.id], ctx.prev);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["tables"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },
